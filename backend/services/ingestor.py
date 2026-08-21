@@ -2,15 +2,24 @@
 services/ingestor.py
 ---------------------
 PDF ingestion pipeline, wrapped as a class per the OOP requirement.
-Same two-phase preview/confirm logic as the original Flask system —
-duplicate detection, resubmission with archived versions, discrepancy
-checking against the student's own form entries.
+Same two-phase preview/confirm logic as before — duplicate detection,
+resubmission with archived versions, discrepancy checking against the
+student's own form entries.
+
+INGESTION SCOPE — CHANGED (per thesis spec): only the paper's ABSTRACT is
+chunked and embedded into ChromaDB now. The full PDF is still opened with
+PyMuPDF and its text is still used for (a) AI metadata extraction — title,
+authors, year, college, abstract, keywords — and (b) the discrepancy
+checker that compares the PDF's own metadata against what the student
+typed. None of that full-document text is embedded or retrieved anymore;
+it's read once at ingest time and then discarded from the RAG index. The
+PDF itself remains on disk and is still served to the PDF viewer — that's
+just no longer connected to retrieval.
 
 Adapted for FastAPI: works with UploadFile instead of Flask's file
-object, writes to Research/ResearchVersion via SQLAlchemy async
-sessions instead of raw sqlite3, and wraps every blocking call
-(PyMuPDF, the Groq metadata call, ChromaDB writes) in asyncio.to_thread
-so nothing blocks the event loop.
+object, writes to Research/ResearchVersion via SQLAlchemy async sessions,
+and wraps every blocking call (PyMuPDF, the Groq metadata call, ChromaDB
+writes) in asyncio.to_thread so nothing blocks the event loop.
 """
 import json
 import logging
@@ -31,7 +40,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import (
-    GROQ_API_KEY, LLM_MODEL, CHUNK_SIZE, CHUNK_OVERLAP,
+    GROQ_API_KEY, LLM_MODEL, ABSTRACT_CHUNK_SIZE, ABSTRACT_CHUNK_OVERLAP,
     ALLOWED_EXTENSIONS, STAGING_DIR, PENDING_DIR, VERSIONS_DIR,
     DISCREPANCY_THRESHOLD, PREVIEW_MAX_AGE_SECONDS,
 )
@@ -44,8 +53,15 @@ logger = logging.getLogger(__name__)
 class Ingestor:
     def __init__(self):
         self._llm = ChatGroq(model=LLM_MODEL, api_key=GROQ_API_KEY, temperature=0.1)
+        # Abstracts are short — avoid unnecessarily small chunks (per
+        # spec). A typical 150-300 word abstract is ~900-1800 characters,
+        # so with a chunk size in that range most abstracts end up as a
+        # single chunk; longer ones split with enough overlap to keep
+        # context intact across the boundary. Tune ABSTRACT_CHUNK_SIZE/
+        # ABSTRACT_CHUNK_OVERLAP in config.py against real abstract
+        # lengths in your repository.
         self._splitter = RecursiveCharacterTextSplitter(
-            chunk_size=CHUNK_SIZE, chunk_overlap=CHUNK_OVERLAP,
+            chunk_size=ABSTRACT_CHUNK_SIZE, chunk_overlap=ABSTRACT_CHUNK_OVERLAP,
         )
 
     # ── Sync helpers (called via asyncio.to_thread) ────────────────────
@@ -58,6 +74,11 @@ class Ingestor:
         return int(match.group(1)) if match else None
 
     def _extract_pages(self, path: str) -> list[dict]:
+        """
+        Extracts per-page text from the full PDF. Used ONLY for metadata
+        extraction and discrepancy checking below — no longer used to
+        build embedded chunks (see module docstring).
+        """
         try:
             doc = fitz.open(path)
             pages = []
@@ -72,7 +93,7 @@ class Ingestor:
             return []
 
     def _extract_metadata(self, pages: list[dict], fallback_name: str) -> dict:
-        combined_head = "\n".join(p["text"] for p in pages)[:3000]
+        combined_head = "\n".join(p["text"] for p in pages)[:4000]
         prompt = f"""
 Extract metadata from this ISAT-U academic thesis document.
 Return ONLY valid JSON with these exact keys. Use "Unknown" if not found.
@@ -82,11 +103,11 @@ Return ONLY valid JSON with these exact keys. Use "Unknown" if not found.
   "authors":  "All authors comma-separated",
   "year":     "4-digit year e.g. 2024",
   "college":  "Full college name e.g. College of Industrial Technology",
-  "abstract": "First 2 sentences of abstract",
+  "abstract": "The COMPLETE abstract text, verbatim from the document — not a summary, not truncated",
   "keywords": "Keywords comma-separated"
 }}
 
-Document (first 3000 characters):
+Document (first 4000 characters):
 {combined_head}
 """
         try:
@@ -100,7 +121,7 @@ Document (first 3000 characters):
             logger.warning(f"Metadata extraction failed, using defaults: {e}")
             meta = {
                 "title": fallback_name, "authors": "Unknown", "year": "Unknown",
-                "college": "Unknown", "abstract": combined_head[:200], "keywords": "Unknown",
+                "college": "Unknown", "abstract": combined_head[:500], "keywords": "Unknown",
             }
         meta["year_normalized"] = self._normalize_year(meta.get("year", "Unknown"))
         return meta
@@ -136,6 +157,39 @@ Document (first 3000 characters):
                     (STAGING_DIR / f"{preview_id}.pdf").unlink(missing_ok=True)
         except Exception as e:
             logger.warning(f"Preview cleanup failed (non-fatal): {e}")
+
+    def _build_abstract_documents(self, meta: dict, stem: str, paper_id) -> list[Document]:
+        """
+        Chunks and tags ONLY the abstract for embedding — this is the
+        entire ingestion-to-embedding surface now (per spec: PDF ->
+        Abstract Extraction -> Text Chunking -> Metadata -> Embedding ->
+        ChromaDB). Metadata carries the FULL abstract text on every chunk
+        (not just that chunk's slice) so downstream RAG code can show the
+        complete abstract in context even if it was split into >1 chunk.
+        """
+        abstract_text = (meta.get("abstract") or "").strip()
+        if not abstract_text or abstract_text == "Unknown":
+            abstract_text = "No abstract available for this paper."
+
+        chunks = self._splitter.split_text(abstract_text) or [abstract_text]
+
+        documents = []
+        for idx, chunk in enumerate(chunks, start=1):
+            documents.append(Document(
+                page_content=chunk,
+                metadata={
+                    "paper_id": paper_id,
+                    "title": meta.get("title", stem),
+                    "authors": meta.get("authors", "Unknown"),
+                    "year": str(meta.get("year_normalized") or "Unknown"),
+                    "college": meta.get("college", "Unknown"),
+                    "keywords": meta.get("keywords", "Unknown"),
+                    "abstract": abstract_text,
+                    "source": stem,
+                    "chunk_id": idx,
+                }
+            ))
+        return documents
 
     # ── PREVIEW ──────────────────────────────────────────────────────
 
@@ -246,6 +300,9 @@ Document (first 3000 characters):
 
         shutil.move(str(staged_path), str(pending_path))
 
+        # Full text re-extracted at confirm time in case the PDF changed
+        # between preview and confirm — still used only for metadata
+        # sanity (the "no text found" guard), not for embedding.
         pages = await asyncio.to_thread(self._extract_pages, str(pending_path))
         if not pages:
             raise ValueError("No text found in this PDF at confirm time.")
@@ -262,23 +319,29 @@ Document (first 3000 characters):
         if final_values.get("year"):
             meta["year_normalized"] = self._normalize_year(final_values["year"])
 
-        documents = []
-        for p in pages:
-            for chunk in self._splitter.split_text(p["text"]):
-                documents.append(Document(
-                    page_content=chunk,
-                    metadata={
-                        "title": meta.get("title", stem), "authors": meta.get("authors", "Unknown"),
-                        "year": str(meta.get("year_normalized") or "Unknown"),
-                        "college": meta.get("college", "Unknown"),
-                        "keywords": meta.get("keywords", "Unknown"),
-                        "abstract": meta.get("abstract", ""), "source": stem, "page": p["page"],
-                    }
-                ))
+        # Resolve paper_id BEFORE embedding, so every chunk's metadata
+        # carries the real numeric Research.id rather than just the
+        # filename stem. For a brand-new paper this means creating (and
+        # flushing) the Research row first, then embedding, then doing
+        # the rest of the field updates/commit below.
+        if is_resubmission and existing:
+            paper_id = existing.id
+        else:
+            new_research = Research(
+                title=meta.get("title", stem), authors=meta.get("authors", "Unknown"),
+                department=meta.get("college", "Unknown"), year=meta.get("year_normalized"),
+                abstract=meta.get("abstract", ""), source_stem=stem, filepath=str(pending_path),
+                student_id=student_id, status=StatusEnum.pending,
+            )
+            db.add(new_research)
+            await db.flush()  # assigns new_research.id without committing yet
+            paper_id = new_research.id
+            existing = new_research  # so the field-update block below is uniform
 
+        documents = self._build_abstract_documents(meta, stem, paper_id)
         await vectorstore_service.add_documents(documents)
 
-        if is_resubmission and existing:
+        if is_resubmission:
             existing.title = meta.get("title", stem)
             existing.authors = meta.get("authors", "Unknown")
             existing.department = meta.get("college", "Unknown")
@@ -286,13 +349,7 @@ Document (first 3000 characters):
             existing.abstract = meta.get("abstract", "")
             existing.status = StatusEnum.pending
             existing.feedback_note = None
-        else:
-            db.add(Research(
-                title=meta.get("title", stem), authors=meta.get("authors", "Unknown"),
-                department=meta.get("college", "Unknown"), year=meta.get("year_normalized"),
-                abstract=meta.get("abstract", ""), source_stem=stem, filepath=str(pending_path),
-                student_id=student_id, status=StatusEnum.pending,
-            ))
+        # else: new_research already has correct fields from construction above
 
         await db.commit()
         sidecar_path.unlink(missing_ok=True)
@@ -300,7 +357,7 @@ Document (first 3000 characters):
         action_word = "resubmitted" if is_resubmission else "submitted"
         return {
             "success": True,
-            "message": f"'{meta['title']}' {action_word} — {len(documents)} chunks indexed across {len(pages)} pages.",
+            "message": f"'{meta['title']}' {action_word} — abstract indexed as {len(documents)} chunk(s).",
             "metadata": meta, "chunks": len(documents), "source": stem, "resubmission": is_resubmission,
         }
 

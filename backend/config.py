@@ -23,15 +23,16 @@ VERSIONS_DIR = PAPERS_DIR / "versions"
 for d in (STAGING_DIR, PENDING_DIR, PUBLIC_DIR, VERSIONS_DIR):
     d.mkdir(parents=True, exist_ok=True)
 
-LLM_MODEL        = "llama-3.3-70b-versatile"
+LLM_MODEL        = "openai/gpt-oss-120b"
 EMBEDDING_MODEL  = "jinaai/jina-embeddings-v2-small-en"
 RERANKER_MODEL   = "BAAI/bge-reranker-v2-m3"
 
-CHUNK_SIZE       = 800
-CHUNK_OVERLAP    = 150
-RETRIEVAL_TOP_K  = 20
-RERANK_TOP_K     = 5
-SCORE_THRESHOLD  = 0.15
+ABSTRACT_CHUNK_SIZE     = 1000   # renamed from CHUNK_SIZE — abstract-only now, not full-page chunking
+ABSTRACT_CHUNK_OVERLAP  = 100    # renamed from CHUNK_OVERLAP
+RERANK_SCORE_THRESHOLD  = 0.0
+
+RETRIEVAL_TOP_K = 20   # L2 first-stage candidate count (ChromaDB) — before reranking
+RERANK_TOP_K    = 5    # how many survive the Cross-Encoder into the LLM's context
 
 CHROMA_COLLECTION = "isatu_repository"
 

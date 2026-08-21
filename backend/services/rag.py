@@ -3,13 +3,22 @@ services/rag.py
 -----------------
 Retrieval-Augmented Generation, wrapped as RAGService.
 
-Pipeline: query -> ChromaDB cosine similarity (top 20, approved-only)
--> reranker (top 5) -> Groq LLM (async .ainvoke, never blocks event loop)
+Pipeline: query -> ChromaDB L2 distance (top-K, approved-only)
+-> Cross-Encoder reranker (top-N, threshold-filtered) -> Groq LLM
+(async .ainvoke, never blocks the event loop)
 
-CACHING: unlike the original Flask system's in-memory dict, results are
-cached in the AIAnalysis table, keyed by research_id — survives server
-restarts. Cache is cleared by clear_cache_for() whenever the underlying
-paper's content changes (delete, resubmission).
+RETRIEVAL SCOPE — CHANGED (per thesis spec): the index now holds only
+paper ABSTRACTS, not full-document page chunks. Two consequences:
+  1. Retrieval metric is ChromaDB's default L2 distance, not cosine
+     (see services/vectorstore.py).
+  2. Citations are now per-STUDY ("[Title]"), not per-PAGE ("(p. X)") —
+     there's no page granularity left to cite, since full-document text
+     is no longer embedded. See CITATION_RULE below.
+
+CACHING: results are cached in the AIAnalysis table, keyed by
+research_id — survives server restarts. Cache is cleared by
+clear_cache_for() whenever the underlying paper's content changes
+(delete, resubmission).
 
 chat() is NOT cached — every conversation turn is unique by nature.
 """
@@ -22,7 +31,7 @@ from langchain_groq import ChatGroq
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from config import GROQ_API_KEY, LLM_MODEL, RETRIEVAL_TOP_K, SCORE_THRESHOLD
+from config import GROQ_API_KEY, LLM_MODEL, RETRIEVAL_TOP_K
 from models import AIAnalysis, Research, StatusEnum
 from services.vectorstore import vectorstore_service
 from services.reranker import reranker_service
@@ -32,11 +41,17 @@ logger = logging.getLogger(__name__)
 CITATION_RULE = """
 CITATION RULE: You may synthesize, paraphrase, and connect ideas across the
 context in your own words — you are not limited to copying sentences. However,
-every factual claim must be traceable to a specific page shown in the context
-above. Cite the page inline immediately after the claim, formatted as (p. X).
-If one idea draws from multiple pages, cite all of them together,
-e.g. (p. 12, p. 24). Do NOT invent page numbers that are not shown in the
-context. Do NOT cite a page for your own connective or transitional sentences.
+every factual claim must be traceable to a specific study shown in the context
+above. Cite the study inline immediately after the claim using its title in
+square brackets, e.g. [Optimizing Rice Yield Using IoT Sensors]. If one idea
+draws from multiple studies, cite all of them together, e.g. [Study A; Study
+B]. Do NOT cite a study that is not shown in the context above. Do NOT cite a
+study for your own connective or transitional sentences. Remember that you are
+working from ABSTRACTS ONLY — do not claim knowledge of a study's exact
+dataset, detailed methodology, hyperparameters, implementation details, or
+complete experimental results unless the abstract itself states them. If the
+proposal's question needs that level of detail, say the available abstracts
+don't contain enough information rather than guessing.
 """
 
 SIMILAR_PROMPT = PromptTemplate.from_template("""
@@ -51,7 +66,7 @@ Proposal: {question}
 
 List the top 3 most similar studies. For each:
 - Title, Authors, Year, College
-- Why it is similar (2-3 sentences, with page citations for specific claims)
+- Why it is similar (2-3 sentences, based on the abstract)
 - Similarity: HIGH / MODERATE / LOW
 """)
 
@@ -151,29 +166,40 @@ class RAGService:
         return {row[0] for row in result.all()}
 
     async def _retrieve_and_rerank(self, query: str, db: AsyncSession) -> list:
+        """
+        L2 Top-K Candidates -> Cross-Encoder -> Reranked Top-N.
+        Relevance filtering happens inside reranker_service now — L2
+        distance alone isn't a meaningful cutoff (see vectorstore.py).
+        """
         approved = await self._get_approved_sources(db)
         if not approved:
             return []
-        docs = await vectorstore_service.similarity_search(query, RETRIEVAL_TOP_K, approved, SCORE_THRESHOLD)
+        docs = await vectorstore_service.similarity_search(query, RETRIEVAL_TOP_K, approved)
         if not docs:
             return []
         return await reranker_service.rerank(query, docs)
 
     def _format_context(self, docs: list) -> str:
+        """
+        Builds the LLM context from retrieved abstract chunks. Dedupes by
+        paper (not by chunk) and always shows the FULL abstract text from
+        metadata — even if that paper matched via more than one chunk —
+        so the LLM never sees a truncated abstract.
+        """
         if not docs:
-            return "No relevant documents found in the repository."
+            return "No relevant research found in the repository."
         parts, seen = [], set()
         for doc in docs:
             title = doc.metadata.get("title", "Untitled")
-            page = doc.metadata.get("page", "?")
-            key = (title, page)
+            paper_id = doc.metadata.get("paper_id")
+            key = paper_id if paper_id is not None else title
             if key in seen:
                 continue
             seen.add(key)
             parts.append(
                 f"[{title} | {doc.metadata.get('authors','?')} | "
-                f"{doc.metadata.get('year','?')} | {doc.metadata.get('college','?')} | "
-                f"Page {page}]\n{doc.page_content}"
+                f"{doc.metadata.get('year','?')} | {doc.metadata.get('college','?')}]\n"
+                f"{doc.metadata.get('abstract', doc.page_content)}"
             )
         return "\n\n---\n\n".join(parts)
 
@@ -181,19 +207,17 @@ class RAGService:
         seen = {}
         for doc in docs:
             title = doc.metadata.get("title", "Untitled")
-            page = doc.metadata.get("page", None)
-            if title not in seen:
-                seen[title] = {
-                    "title": title, "authors": doc.metadata.get("authors", "Unknown"),
-                    "year": doc.metadata.get("year", "Unknown"), "college": doc.metadata.get("college", "Unknown"),
-                    "pages": [],
+            paper_id = doc.metadata.get("paper_id")
+            key = paper_id if paper_id is not None else title
+            if key not in seen:
+                seen[key] = {
+                    "paper_id": paper_id,
+                    "title": title,
+                    "authors": doc.metadata.get("authors", "Unknown"),
+                    "year": doc.metadata.get("year", "Unknown"),
+                    "college": doc.metadata.get("college", "Unknown"),
                 }
-            if page is not None and page not in seen[title]["pages"]:
-                seen[title]["pages"].append(page)
-        sources = list(seen.values())
-        for s in sources:
-            s["pages"].sort()
-        return sources
+        return list(seen.values())
 
     async def _run(self, prompt: PromptTemplate, query: str, db: AsyncSession, history: str = "") -> dict:
         docs = await self._retrieve_and_rerank(query, db)
