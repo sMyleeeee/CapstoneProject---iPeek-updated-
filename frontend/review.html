@@ -4,47 +4,36 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>iPeek — Review Queue</title>
-  <!-- All styles from style.css — no inline styles -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body style="visibility:hidden;">
   <div class="page-ambient" id="ambientBg"></div>
-  <!-- Top navigation bar -->
+
   <nav class="navbar">
     <div class="nav-brand">
       <div class="nav-logo">i</div>
       Research Repository
     </div>
-    <div class="nav-links">
-      <a class="nav-link active" href="dashboard.html">Dashboard</a>
-      <a class="nav-link" href="review.html">Review Queue</a>
-      <a class="nav-link" href="browse.html">Browse</a>
-      <a class="nav-link" href="upload.html">Upload</a>
-    </div>
+    <div class="nav-links"></div>
     <div class="nav-right">
-    <a href="profile.html" class="avatar" id="avatarEl" title="View Profile"></a>
-    <span class="role-pill" id="rolePill"></span>
-    <button class="btn btn-ghost btn-sm" onclick="logout()">Sign Out</button>
-  </div>
+      <a href="profile.html" class="avatar" id="avatarEl" title="View Profile"></a>
+      <span class="role-pill" id="rolePill"></span>
+      <button class="btn btn-ghost btn-sm" onclick="logout()">Sign Out</button>
+    </div>
   </nav>
 
-  <!-- Two-column review layout: submission list | detail view -->
   <div class="layout-review">
-
     <!-- Left panel: submission list -->
     <div class="sub-panel">
-
-      <!-- Panel header: title, search, filter tabs -->
       <div class="sub-panel-header">
         <h3>Submissions for Review</h3>
-
-        <!-- Search submissions by title or author -->
-        <div class="search-wrap" style="margin-bottom:10px;">
+        <div class="search-wrap mb-sm">
           <span class="search-icon">🔍</span>
           <input type="text" id="searchInput" placeholder="Search pending research...">
         </div>
-
-        <!-- Filter tabs: All | Pending | Returned -->
         <div class="filter-tabs">
           <button class="filter-tab active" onclick="filterList('all',this)">
             All (<span id="cntAll">0</span>)
@@ -56,45 +45,51 @@
             Returned (<span id="cntReturned">0</span>)
           </button>
         </div>
-
-        <!-- Bulk delete bar — shown when 1+ checkboxes selected, librarian only -->
         <div class="bulk-bar" id="bulkBar" style="display:none;">
           <span id="bulkCount">0 selected</span>
           <div class="bulk-bar-actions">
             <button class="btn btn-ghost btn-sm" onclick="clearSelection()">Cancel</button>
-            <button class="btn btn-danger btn-sm" onclick="confirmBulkDelete()">🗑 Delete Selected</button>
+            <button class="btn btn-danger btn-sm" onclick="confirmBulkDelete()">Delete Selected</button>
           </div>
         </div>
       </div>
-
-      <!-- Scrollable list of submission cards — populated by review.js -->
       <div class="sub-list" id="subList"></div>
-
     </div>
 
-    <!-- Right panel: detail view of selected submission -->
-    <!-- Initially shows an empty state prompt — replaced by review.js when a card is clicked -->
+    <!-- Right panel: detail view (desktop) -->
     <div class="detail-panel" id="detailPanel">
       <div class="empty-detail">
         <div class="icon">📋</div>
-        <p style="font-weight:600;margin-bottom:4px;">No submission selected</p>
-        <p style="font-size:0.8rem;">Click a submission on the left to review it.</p>
+        <p class="empty-detail-title">No submission selected</p>
+        <p class="empty-detail-sub">Click a submission on the left to review it.</p>
       </div>
     </div>
-
   </div>
 
-  <!-- Toast notification container -->
+  <!-- Mobile detail sheet (shown on tap instead of right panel) -->
+  <div class="review-detail-sheet" id="reviewDetailSheet">
+    <div class="review-detail-sheet-header">
+      <button class="review-detail-sheet-back" onclick="closeReviewSheet()">←</button>
+      <span class="empty-detail-title" style="font-size:0.9rem;">Review Submission</span>
+    </div>
+    <div id="reviewSheetContent"></div>
+  </div>
+
   <div class="toast-wrap" id="toasts"></div>
 
-  <!-- Shared API layer -->
   <script src="js/api.js"></script>
-  <script src="js/motion.js">
-  </script>
   <script src="js/pillnav.js"></script>
-  <!-- Review queue logic -->
+  <script src="js/motion.js"></script>
   <script src="js/review.js"></script>
+
   <script>
+    function openReviewSheet() {
+      document.getElementById("reviewDetailSheet").classList.add("open");
+    }
+    function closeReviewSheet() {
+      document.getElementById("reviewDetailSheet").classList.remove("open");
+    }
+
     async function logout() {
       try { await apiLogout(); } catch {}
       sessionStorage.clear();

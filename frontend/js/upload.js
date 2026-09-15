@@ -144,8 +144,20 @@ function clearFile() {
   document.getElementById("dropZone").style.display = "block";
 
   document.getElementById("fileInput").value = "";
+
+  setStep(1);
 }
 
+
+/* ── Step tracker helpers ──────────────────────────────────────────────── */
+
+function setStep(num) {
+  document.querySelectorAll(".steps .step").forEach((el, i) => {
+    el.classList.remove("active", "done");
+    if (i + 1 < num) el.classList.add("done");
+    if (i + 1 === num) el.classList.add("active");
+  });
+}
 
 /* ── Step 1: upload + AI extraction ─────────────────────────────────── */
 
@@ -164,14 +176,15 @@ async function submitPaper() {
   status.style.display = "block";
 
   status.style.cssText =
-    "display:block;padding:12px 14px;border-radius:7px;" +
+    "display:block;padding:12px 14px;border-radius:var(--radius-sm);" +
     "font-size:0.84rem;color:var(--muted);" +
-    "background:var(--bg);";
+    "background:var(--bg);box-shadow:var(--neo-inset);";
 
   status.textContent =
-    "⏳ Extracting metadata from your PDF... please don't close or navigate away.";
+    "Extracting metadata from your PDF... please don't close or navigate away.";
 
   uploadInProgress = true;
+  setStep(2);
 
   const emptyFormData = {
     title: "",
@@ -194,14 +207,15 @@ async function submitPaper() {
     btn.style.display = "none";
 
     showMetaModal(preview.ai_metadata);
+    setStep(3);
 
   } catch (e) {
     status.style.cssText =
-      "display:block;padding:12px 14px;border-radius:7px;" +
+      "display:block;padding:12px 14px;border-radius:var(--radius-sm);" +
       "font-size:0.84rem;color:var(--danger);" +
-      "background:#fef2f2;border:1px solid #fca5a5;";
+      "background:#fef2f2;box-shadow:var(--neo-inset);";
 
-    status.textContent = `⚠️ ${e.message}`;
+    status.textContent = e.message;
 
     btn.disabled = false;
 
@@ -234,7 +248,8 @@ function showMetaModal(meta) {
   document.getElementById("metaKeywords").textContent =
     meta.keywords || "—";
 
-  document.getElementById("metaModal").style.display = "flex";
+  const modal = document.getElementById("metaModal");
+  modal.style.display = "flex";
 }
 
 /**
@@ -257,6 +272,7 @@ function cancelMetaConfirm() {
   document.getElementById("metaModal").style.display = "none";
 
   currentPreviewId = null;
+  setStep(1);
 }
 
 
@@ -279,12 +295,12 @@ async function confirmMetaAndSubmit() {
   status.style.display = "block";
 
   status.style.cssText =
-    "display:block;padding:12px 14px;border-radius:7px;" +
+    "display:block;padding:12px 14px;border-radius:var(--radius-sm);" +
     "font-size:0.84rem;color:var(--muted);" +
-    "background:var(--bg);";
+    "background:var(--bg);box-shadow:var(--neo-inset);";
 
   status.textContent =
-    "⏳ Uploading and indexing document into repository... please don't close or navigate away.";
+    "Uploading and indexing document into repository... please don't close or navigate away.";
 
   uploadInProgress = true;
 
@@ -297,12 +313,12 @@ async function confirmMetaAndSubmit() {
     document.getElementById("metaModal").style.display = "none";
 
     status.style.cssText =
-      "display:block;padding:12px 14px;border-radius:7px;" +
+      "display:block;padding:12px 14px;border-radius:var(--radius-sm);" +
       "font-size:0.84rem;color:var(--success);" +
-      "background:#f0fdf4;border:1px solid #86efac;";
+      "background:#f0fdf4;box-shadow:var(--neo-inset);";
 
     status.textContent =
-      `✅ "${result.metadata?.title || selectedFile.name}" submitted — ` +
+      `"${result.metadata?.title || selectedFile.name}" submitted — ` +
       `${result.chunks} chunks indexed. Pending librarian review.`;
 
     toast(
@@ -316,12 +332,12 @@ async function confirmMetaAndSubmit() {
 
   } catch (e) {
     status.style.cssText =
-      "display:block;padding:12px 14px;border-radius:7px;" +
+      "display:block;padding:12px 14px;border-radius:var(--radius-sm);" +
       "font-size:0.84rem;color:var(--danger);" +
-      "background:#fef2f2;border:1px solid #fca5a5;";
+      "background:#fef2f2;box-shadow:var(--neo-inset);";
 
     status.textContent =
-      `⚠️ Submission failed: ${e.message}`;
+      `Submission failed: ${e.message}`;
 
     btn.disabled = false;
 

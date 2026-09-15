@@ -151,6 +151,11 @@ class ChatIn(BaseModel):
     history: Optional[List[dict]] = None
 
 
+class RefineIn(BaseModel):
+    query: str
+    target: str  # "similarity" | "summary" | "gap"
+
+
 class ChatOut(BaseModel):
     result: str
     sources: list

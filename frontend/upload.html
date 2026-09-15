@@ -1,10 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>iPeek — Submit Research</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
 </head>
 
@@ -15,12 +17,7 @@
       <div class="nav-logo">i</div>
       Research Repository
     </div>
-
-    <div class="nav-links">
-      <a class="nav-link" href="browse.html">Browse Research</a>
-      <a class="nav-link active" href="upload.html">Submit Proposal</a>
-    </div>
-
+    <div class="nav-links"></div>
     <div class="nav-right">
       <a href="profile.html" class="avatar" id="avatarEl" title="View Profile"></a>
       <span class="role-pill" id="rolePill"></span>
@@ -31,13 +28,30 @@
   <div class="upload-wrap">
     <div class="card">
 
-      <div style="margin-bottom:24px;">
-        <h2 style="font-size:1.05rem;margin-bottom:4px;">📤 Upload Research Paper</h2>
-
-        <p class="text-muted" style="font-size:0.8rem;">
+      <div class="mb-lg">
+        <h2 style="font-size:1.05rem;margin-bottom:4px;">Upload Research Paper</h2>
+        <p class="text-muted text-sm">
           Drop your PDF below. Our AI will extract the title, authors, year, department,
           and abstract automatically — a librarian will review the details before it's published.
         </p>
+      </div>
+
+      <!-- Step tracker -->
+      <div class="steps" id="stepTracker">
+        <div class="step active" id="step1">
+          <div class="step-dot">1</div>
+          <span>Select File</span>
+        </div>
+        <div class="step-line"></div>
+        <div class="step" id="step2">
+          <div class="step-dot">2</div>
+          <span>AI Extraction</span>
+        </div>
+        <div class="step-line"></div>
+        <div class="step" id="step3">
+          <div class="step-dot">3</div>
+          <span>Confirm</span>
+        </div>
       </div>
 
       <!-- Drag and drop zone -->
@@ -47,155 +61,84 @@
            ondragover="dragOver(event)"
            ondragleave="dragLeave(event)"
            ondrop="dropped(event)">
-
         <div class="drop-icon">📄</div>
-
         <div class="drop-text">
           <strong>Drag &amp; drop your PDF here</strong><br>
           or <span>click to browse files</span> — max 25MB
         </div>
-
-        <input
-          type="file"
-          id="fileInput"
-          accept=".pdf"
-          style="display:none"
-          onchange="fileChosen(event)"
-        >
+        <input type="file" id="fileInput" accept=".pdf" style="display:none" onchange="fileChosen(event)">
       </div>
 
-      <!-- File info bar shown after a file is selected -->
-      <div
-        id="fileInfo"
-        style="display:none;margin-top:10px;padding:10px 14px;
-               background:var(--bg);border-radius:7px;border:1px solid var(--border);
-               display:flex;align-items:center;gap:10px;font-size:0.84rem;"
-      >
+      <!-- File info chip -->
+      <div id="fileInfo" class="file-info-chip" style="display:none;">
         <span>📄</span>
-
-        <span
-          id="fileName"
-          style="flex:1;font-weight:600;"
-        ></span>
-
-        <span
-          id="fileSize"
-          style="color:var(--muted);"
-        ></span>
-
-        <button
-          onclick="clearFile()"
-          style="border:none;background:none;cursor:pointer;color:var(--danger);"
-        >
-          ✕
-        </button>
+        <span id="fileName" class="file-name"></span>
+        <span id="fileSize" class="file-size"></span>
+        <button class="btn btn-ghost btn-sm" onclick="viewSelectedFile()" title="Preview PDF">👁 View</button>
+        <button class="btn-clear" onclick="clearFile()" title="Remove file">✕</button>
       </div>
 
-      <!-- Status message shown during/after processing -->
-      <div
-        id="submitStatus"
-        style="display:none;margin-top:14px;"
-      ></div>
+      <!-- Status message -->
+      <div id="submitStatus" style="display:none;" class="mt-md"></div>
 
-      <div class="form-actions" style="margin-top:18px;">
+      <div class="form-actions mt-lg">
         <div></div>
-
-        <button
-          class="btn btn-accent btn-lg"
-          id="submitBtn"
-          onclick="submitPaper()"
-        >
+        <button class="btn btn-accent btn-lg" id="submitBtn" onclick="submitPaper()">
           Submit Research →
         </button>
-        <button onclick="viewSelectedFile()">👁 View</button>
       </div>
 
     </div>
   </div>
 
   <div class="toast-wrap" id="toasts"></div>
-    
+
   <!-- AI Metadata Confirmation Modal -->
-  <div
-    id="metaModal"
-    class="modal-overlay"
-    style="display:none;"
-  >
-  
-    <div
-      class="modal-box card"
-      style="max-width:520px;"
-    >
+  <div id="metaModal" class="modal-overlay" style="display:none;">
+    <div class="modal-box" style="max-width:520px;width:100%;">
 
-      <h3 style="font-size:0.98rem;margin-bottom:4px;">
-        🤖 Here's what we found in your PDF
+      <h3 class="modal-title">
+        Here's what we found in your PDF
       </h3>
-
-      <p
-        class="text-muted"
-        style="font-size:0.8rem;margin-bottom:16px;"
-      >
+      <p class="text-muted modal-subtitle">
         Review the extracted details below. This is what will be submitted for librarian review.
       </p>
 
-      <div
-        style="font-size:0.84rem;display:grid;gap:10px;margin-bottom:18px;"
-      >
-
+      <div class="meta-grid">
         <div>
           <span class="text-muted">Title:</span><br>
           <strong id="metaTitle">—</strong>
         </div>
-
         <div>
           <span class="text-muted">Authors:</span><br>
           <strong id="metaAuthors">—</strong>
         </div>
-
         <div>
           <span class="text-muted">Year:</span><br>
           <strong id="metaYear">—</strong>
         </div>
-
         <div>
           <span class="text-muted">College / Department:</span><br>
           <strong id="metaCollege">—</strong>
         </div>
-
         <div>
           <span class="text-muted">Abstract:</span><br>
-          <span
-            id="metaAbstract"
-            style="font-size:0.82rem;"
-          >
-            —
-          </span>
+          <span id="metaAbstract" class="text-sm">—</span>
         </div>
-
         <div>
           <span class="text-muted">Keywords:</span><br>
           <span id="metaKeywords">—</span>
         </div>
-
       </div>
 
       <div class="form-actions">
-
-        <button
-          class="btn btn-ghost"
-          onclick="cancelMetaConfirm()"
-        >
-          Cancel
-        </button>
-
-        <button
-          class="btn btn-accent btn-lg"
-          id="confirmMetaBtn"
-          onclick="confirmMetaAndSubmit()"
-        >
+        <div class="flex-gap">
+          <button class="btn btn-ghost" onclick="cancelMetaConfirm()">Cancel</button>
+          <button class="btn btn-ghost" onclick="viewUploadedPdf()">📄 View Uploaded PDF</button>
+        </div>
+        <button class="btn btn-accent btn-lg" id="confirmMetaBtn" onclick="confirmMetaAndSubmit()">
           Confirm & Submit →
         </button>
-
       </div>
 
     </div>
@@ -208,10 +151,7 @@
 
   <script>
     async function logout() {
-      try {
-        await apiLogout();
-      } catch {}
-
+      try { await apiLogout(); } catch {}
       sessionStorage.clear();
       window.location.replace("index.html");
     }

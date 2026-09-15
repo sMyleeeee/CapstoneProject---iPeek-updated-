@@ -4,72 +4,48 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>iPeek — Profile</title>
-  <!-- All styles from style.css — no inline styles -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body style="visibility:hidden;">
-  <!-- Top navigation bar -->
   <nav class="navbar">
     <div class="nav-brand">
       <div class="nav-logo">i</div>
       Research Repository
     </div>
-    <div class="nav-links">
-      <a class="nav-link" href="browse.html">Browse Research</a>
-      <a class="nav-link" href="upload.html">Submit Proposal</a>
-    </div>
+    <div class="nav-links"></div>
     <div class="nav-right">
-    <a href="profile.html" class="avatar" id="avatarEl" title="View Profile"></a>
-    <span class="role-pill" id="rolePill"></span>
-    <button class="btn btn-ghost btn-sm" onclick="logout()">Sign Out</button>
-  </div>
+      <a href="profile.html" class="avatar" id="avatarEl" title="View Profile"></a>
+      <span class="role-pill" id="rolePill"></span>
+      <button class="btn btn-ghost btn-sm" onclick="logout()">Sign Out</button>
+    </div>
   </nav>
 
-  <!-- Centered two-column profile layout -->
   <div class="profile-layout">
-
     <!-- Left column: avatar card -->
     <div>
       <div class="profile-avatar-card">
-
-        <!-- Large avatar circle with edit overlay -->
         <div class="avatar-large" id="avatarLarge" title="Click to change photo">
-          <!-- Initials filled by profile.js -->
           <span id="avatarInitials"></span>
           <div class="avatar-edit">✏️</div>
         </div>
-
-        <!-- Display name and email — filled by profile.js -->
-        <div class="profile-name"  id="profileName"></div>
+        <div class="profile-name" id="profileName"></div>
         <div class="profile-email" id="profileEmail"></div>
-
-        <!-- Role badge -->
         <span class="role-pill" id="profileRolePill"></span>
-
-        <!-- Meta info: university, ID, member since, papers count -->
         <div class="profile-meta">
-          <div class="profile-meta-item">
-            🏛️ <strong id="metaUniv">ISAT-U</strong>
-          </div>
-          <div class="profile-meta-item">
-            🪪 <strong id="metaId">—</strong>
-          </div>
-          <div class="profile-meta-item">
-            📅 <strong>Member since 2019</strong>
-          </div>
-          <div class="profile-meta-item">
-            📄 <strong id="metaPapers">0</strong> validated papers
-          </div>
+          <div class="profile-meta-item">🏛️ <strong id="metaUniv">ISAT-U</strong></div>
+          <div class="profile-meta-item">🪪 <strong id="metaId">—</strong></div>
+          <div class="profile-meta-item">📅 <strong>Member since 2019</strong></div>
+          <div class="profile-meta-item">📄 <strong id="metaPapers">0</strong> validated papers</div>
         </div>
-
       </div>
     </div>
 
     <!-- Right column: settings form -->
     <div>
       <div class="profile-form-card">
-
-        <!-- Personal Information section -->
         <div class="section-title">Personal Information</div>
 
         <div class="form-row">
@@ -105,10 +81,8 @@
           </select>
         </div>
 
-        <!-- Divider between sections -->
         <hr class="divider">
 
-        <!-- Change Password section -->
         <div class="section-title">Change Password</div>
 
         <div class="form-group">
@@ -119,14 +93,12 @@
         <div class="form-row">
           <div class="form-group">
             <label class="form-label">New Password</label>
-            <input class="form-input" id="newPw" type="password"
-                   placeholder="Min. 8 characters"
-                   oninput="checkStrength(this.value)">
-            <!-- Password strength indicator bar -->
+            <input class="form-input" id="newPw" type="password" placeholder="Min. 8 characters" oninput="checkStrength(this.value)">
             <div class="pw-bar">
-              <div class="pw-fill" id="pwFill" style="width:0%;"></div>
+              <div class="pw-segment" id="pwSeg1"></div>
+              <div class="pw-segment" id="pwSeg2"></div>
+              <div class="pw-segment" id="pwSeg3"></div>
             </div>
-            <!-- Strength label: Weak / Medium / Strong -->
             <div class="pw-label" id="pwLabel"></div>
           </div>
           <div class="form-group">
@@ -135,27 +107,28 @@
           </div>
         </div>
 
-        <!-- Save / Cancel buttons -->
-        <div class="form-actions-right">
+        <!-- Desktop save/cancel -->
+        <div class="form-actions-right profile-actions-desktop">
           <button class="btn btn-ghost" onclick="cancelChanges()">Cancel</button>
           <button class="btn btn-primary" onclick="saveChanges()">Save Changes</button>
         </div>
-
       </div>
     </div>
-
   </div>
 
-  <!-- Toast notification container -->
+  <!-- Mobile sticky bottom bar -->
+  <div class="profile-actions-sticky">
+    <button class="btn btn-ghost" onclick="cancelChanges()">Cancel</button>
+    <button class="btn btn-primary" onclick="saveChanges()">Save Changes</button>
+  </div>
+
   <div class="toast-wrap" id="toasts"></div>
 
-  <!-- Shared API layer -->
   <script src="js/api.js"></script>
-  <script src="js/motion.js">
-  </script>
   <script src="js/pillnav.js"></script>
-  <!-- Profile page logic -->
+  <script src="js/motion.js"></script>
   <script src="js/profile.js"></script>
+
   <script>
     async function logout() {
       try { await apiLogout(); } catch {}

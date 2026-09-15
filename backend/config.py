@@ -25,7 +25,7 @@ for d in (STAGING_DIR, PENDING_DIR, PUBLIC_DIR, VERSIONS_DIR):
 
 LLM_MODEL        = "openai/gpt-oss-120b"
 EMBEDDING_MODEL  = "jinaai/jina-embeddings-v2-small-en"
-RERANKER_MODEL   = "BAAI/bge-reranker-v2-m3"
+RERANKER_MODEL   = "Xenova/ms-marco-MiniLM-L-6-v2"
 
 CHUNK_SIZE       = 800
 CHUNK_OVERLAP    = 150

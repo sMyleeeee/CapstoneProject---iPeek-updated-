@@ -71,13 +71,15 @@ function saveOriginalValues() {
  * @param {string} pw
  */
 function checkStrength(pw) {
-  const fill  = document.getElementById("pwFill");
+  const seg1 = document.getElementById("pwSeg1");
+  const seg2 = document.getElementById("pwSeg2");
+  const seg3 = document.getElementById("pwSeg3");
   const label = document.getElementById("pwLabel");
+  const segs = [seg1, seg2, seg3];
 
   if (!pw) {
-    fill.style.width      = "0%";
-    fill.style.background = "";
-    label.textContent     = "";
+    segs.forEach(s => { s.className = "pw-segment"; });
+    label.textContent = "";
     return;
   }
 
@@ -89,18 +91,19 @@ function checkStrength(pw) {
   if (/[^A-Za-z0-9]/.test(pw)) score++;
 
   const levels = [
-    { pct: "20%",  color: "var(--danger)",  text: "Weak"   },
-    { pct: "40%",  color: "var(--danger)",  text: "Weak"   },
-    { pct: "60%",  color: "var(--warning)", text: "Medium" },
-    { pct: "80%",  color: "var(--warning)", text: "Medium" },
-    { pct: "100%", color: "var(--success)", text: "Strong" },
+    { filled: 1, cls: "filled-weak",    text: "Weak"   },
+    { filled: 1, cls: "filled-weak",    text: "Weak"   },
+    { filled: 2, cls: "filled-medium",  text: "Medium" },
+    { filled: 2, cls: "filled-medium",  text: "Medium" },
+    { filled: 3, cls: "filled-strong",  text: "Strong" },
   ];
 
-  const lvl             = levels[Math.min(score, 4)];
-  fill.style.width      = lvl.pct;
-  fill.style.background = lvl.color;
-  label.textContent     = `Password strength: ${lvl.text}`;
-  label.style.color     = lvl.color;
+  const lvl = levels[Math.min(score, 4)];
+  segs.forEach((s, i) => {
+    s.className = "pw-segment";
+    if (i < lvl.filled) s.classList.add(lvl.cls);
+  });
+  label.textContent = `Password strength: ${lvl.text}`;
 }
 
 /* ── Save changes ────────────────────────────────────────────────────────── */
@@ -148,7 +151,7 @@ async function saveChanges() {
     try {
       await apiUpdatePassword(currentPw, newPw);
       ["currentPw", "newPw", "confirmPw"].forEach(id => { document.getElementById(id).value = ""; });
-      document.getElementById("pwFill").style.width  = "0%";
+      ["pwSeg1", "pwSeg2", "pwSeg3"].forEach(id => { document.getElementById(id).className = "pw-segment"; });
       document.getElementById("pwLabel").textContent = "";
       toast("Profile and password updated successfully.", "success");
       return;
@@ -169,7 +172,7 @@ function cancelChanges() {
     if (el) el.value = val;
   });
   ["currentPw", "newPw", "confirmPw"].forEach(id => { document.getElementById(id).value = ""; });
-  document.getElementById("pwFill").style.width  = "0%";
+  ["pwSeg1", "pwSeg2", "pwSeg3"].forEach(id => { document.getElementById(id).className = "pw-segment"; });
   document.getElementById("pwLabel").textContent = "";
   toast("Changes cancelled.", "info");
 }

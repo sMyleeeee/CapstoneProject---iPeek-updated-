@@ -4,19 +4,18 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>iPeek — Research Detail</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body style="visibility:hidden;">
-  <!-- Top navigation bar -->
   <nav class="navbar">
     <div class="nav-brand">
       <div class="nav-logo">i</div>
       Research Repository
     </div>
-    <div class="nav-links">
-      <a class="nav-link" href="browse.html">Browse Research</a>
-      <a class="nav-link" href="upload.html">Submit Proposal</a>
-    </div>
+    <div class="nav-links"></div>
     <div class="nav-right">
       <a href="profile.html" class="avatar" id="avatarEl" title="View Profile"></a>
       <span class="role-pill" id="rolePill"></span>
@@ -24,156 +23,137 @@
     </div>
   </nav>
 
-  <!-- Two-column layout: centre | right panel (no left sidebar on detail pages) -->
   <div class="layout-two">
 
-    <!-- Centre: paper info + PDF viewer + AI analysis + chat -->
-    <div class="main">
+    <a class="back-link" href="browse.html">← Back to Browse</a>
 
-      <!-- Breadcrumb -->
-      <div class="breadcrumb">
-        <a href="browse.html">← Browse</a> / Research Detail
-      </div>
-
-      <!-- Paper info card -->
-      <div class="card" style="margin-bottom:14px;">
-        <div class="paper-title"  id="paperTitle">Loading...</div>
-        <div class="paper-meta"   id="paperMeta"></div>
-        <div class="meta-chips"   id="metaChips"></div>
-        <div class="section-label">Abstract</div>
-        <div class="abstract-text" id="abstractText">Loading...</div>
-      </div>
-
-      <!-- Trigger card — visible by default -->
-      <div class="card" style="margin-bottom:14px;" id="pdfViewerTrigger">
-        <button class="btn btn-primary" onclick="revealPdfViewer()">
-          📄 Read Full Version
-        </button>
-      </div>
-
-      <!-- Viewer card — hidden by default, shown by revealPdfViewer() -->
-      <div class="card" id="pdfViewerCard" style="display:none;margin-bottom:14px;">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-          <h3 style="font-size:0.9rem;">📄 Document Viewer</h3>
-          <div style="display:flex;align-items:center;gap:8px;">
-            <button class="btn btn-ghost btn-sm" onclick="pdfPrevPage()" id="pdfPrevBtn">‹ Prev</button>
-            <span id="pdfPageInfo" style="font-size:0.78rem;color:var(--muted);">Page — / —</span>
-            <button class="btn btn-ghost btn-sm" onclick="pdfNextPage()" id="pdfNextBtn">Next ›</button>
-            <button class="btn btn-ghost btn-sm" onclick="hidePdfViewer()">✕ Hide</button>
-          </div>
-        </div>
-        <div style="background:#f0f0f0;border-radius:var(--radius);overflow:hidden;text-align:center;">
-          <canvas id="pdfCanvas" style="max-width:100%;display:block;margin:0 auto;"></canvas>
-        </div>
-        <div id="pdfError" style="display:none;padding:20px;text-align:center;color:var(--danger);font-size:0.84rem;"></div>
-      </div>
-      <!-- END pdfViewerCard -->
-
-      <!-- AI Analysis card -->
-      <div class="card" style="margin-bottom:14px;">
-        <div class="analysis-header">
-          <h3>AI Analysis</h3>
-          <span class="badge badge-pending" id="analysisStatus">Running...</span>
-        </div>
-
-        <!-- Tab switcher -->
-        <div class="tabs">
-          <button class="tab-btn active" onclick="switchTab('similarity',this)">Similarity Report</button>
-          <button class="tab-btn"        onclick="switchTab('summary',this)">AI Summary</button>
-          <button class="tab-btn"        onclick="switchTab('gaps',this)">Research Gap</button>
-        </div>
-
-        <!-- Similarity tab (shown by default) -->
-        <div id="tabSimilarity">
-          <div id="simBars">
-            <div style="display:flex;align-items:center;gap:8px;
-                        padding:20px;color:var(--muted);justify-content:center;">
-              <div class="spinner"></div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Summary tab (hidden by default) -->
-        <div id="tabSummary" style="display:none;">
-          <div class="ai-box" id="summaryBox">
-            <div style="display:flex;align-items:center;gap:8px;color:var(--muted);">
-              <div class="spinner"></div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Gaps tab (hidden by default) -->
-        <div id="tabGaps" style="display:none;">
-          <div class="ai-box" id="gapsBox">
-            <div style="display:flex;align-items:center;gap:8px;color:var(--muted);">
-              <div class="spinner"></div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Research Assistant chat -->
-      <div class="card">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
-          <h3 style="font-size:0.9rem;">🤖 Research Assistant</h3>
-          <span style="font-size:0.72rem;color:var(--muted);">
-            Ask anything about this study or the repository
-          </span>
-        </div>
-        <div class="chat-wrap" style="height:320px;">
-          <div class="chat-log" id="chatLog">
-            <div class="chat-msg bot">
-              <div class="chat-bubble">
-                Hi! I'm your research assistant. Ask me anything about this study or the repository.
-              </div>
-            </div>
-          </div>
-          <div class="chat-input-row">
-            <textarea id="chatInput"
-              placeholder="Ask about this research... (Enter to send, Shift+Enter for newline)"
-              onkeydown="chatKey(event)"></textarea>
-            <button class="btn btn-primary btn-sm" onclick="sendChat()">Send</button>
-          </div>
-        </div>
-      </div>
-
+    <!-- Paper info card -->
+    <div class="card" style="margin-bottom:14px;">
+      <div class="paper-title" id="paperTitle">Loading...</div>
+      <div class="paper-meta" id="paperMeta"></div>
+      <div class="meta-chips" id="metaChips"></div>
     </div>
-    <!-- END centre column -->
 
-    <!-- Right panel: similar projects -->
-    <div class="right-panel">
-      <div class="rp-title">Similar Projects</div>
-      <div id="similarProjects">
-        <div style="color:var(--muted);font-size:0.8rem;">Loading...</div>
+    <!-- Abstract card -->
+    <div class="card" style="margin-bottom:14px;">
+      <div class="section-label">Abstract</div>
+      <div class="abstract-text" id="abstractText">Loading...</div>
+    </div>
+
+    <!-- PDF trigger card -->
+    <div class="card" style="margin-bottom:14px;" id="pdfViewerTrigger">
+      <button class="btn btn-accent btn-full" onclick="revealPdfViewer()">
+        Read Full Version
+      </button>
+    </div>
+
+    <!-- AI refine bar -->
+    <div class="card refine-bar" style="margin-bottom:14px;">
+      <div class="refine-row">
+        <select id="refineTarget" class="form-input refine-select">
+          <option value="auto">Auto (active tab)</option>
+          <option value="similarity">Similarity</option>
+          <option value="summary">Summary</option>
+          <option value="gap">Gap</option>
+        </select>
+        <input id="refineInput" class="form-input refine-input" placeholder="Ask AI to expand or refocus the analysis...">
+        <button id="refineBtn" class="btn btn-accent" onclick="refineAnalysis()">Refine</button>
+      </div>
+    </div>
+
+    <!-- PDF viewer card (hidden by default) -->
+    <div class="card" id="pdfViewerCard" style="display:none;margin-bottom:14px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <h3 style="font-size:0.9rem;">Document Viewer</h3>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <button class="btn btn-ghost btn-sm" onclick="pdfPrevPage()" id="pdfPrevBtn">‹ Prev</button>
+          <span id="pdfPageInfo" style="font-size:0.78rem;color:var(--muted);">Page — / —</span>
+          <button class="btn btn-ghost btn-sm" onclick="pdfNextPage()" id="pdfNextBtn">Next ›</button>
+          <button class="btn btn-ghost btn-sm" onclick="hidePdfViewer()">✕ Hide</button>
+        </div>
+      </div>
+      <div style="background:var(--bg);border-radius:var(--radius);overflow:hidden;text-align:center;padding:4px;">
+        <canvas id="pdfCanvas" style="max-width:100%;display:block;margin:0 auto;"></canvas>
+      </div>
+      <div id="pdfError" style="display:none;padding:20px;text-align:center;color:var(--danger);font-size:0.84rem;"></div>
+    </div>
+
+    <!-- AI Analysis card -->
+    <div class="ai-analysis-card" style="margin-bottom:14px;">
+      <div class="analysis-header">
+        <h3>AI Analysis</h3>
+        <span class="badge badge-pending" id="analysisStatus">Running...</span>
+      </div>
+
+      <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('similarity',this)">Similarity Report</button>
+        <button class="tab-btn" onclick="switchTab('summary',this)">AI Summary</button>
+        <button class="tab-btn" onclick="switchTab('gaps',this)">Research Gap</button>
+      </div>
+
+      <div id="tabSimilarity">
+        <div id="simBars">
+          <div style="display:flex;align-items:center;gap:8px;padding:20px;color:var(--muted);justify-content:center;">
+            <div class="spinner"></div>
+          </div>
+        </div>
+        <!-- Citation badges rendered here by detail.js -->
+        <div class="citation-badges" id="citationBadges"></div>
+      </div>
+
+      <div id="tabSummary" style="display:none;">
+        <div class="ai-box" id="summaryBox">
+          <div style="display:flex;align-items:center;gap:8px;color:var(--muted);">
+            <div class="spinner"></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="tabGaps" style="display:none;">
+        <div class="ai-box" id="gapsBox">
+          <div style="display:flex;align-items:center;gap:8px;color:var(--muted);">
+            <div class="spinner"></div>
+          </div>
+        </div>
       </div>
     </div>
 
   </div>
 
-  <!-- Toast notification container -->
+  <!-- Mobile PDF full-screen overlay -->
+  <div class="pdf-overlay" id="pdfOverlay">
+    <div class="pdf-overlay-header">
+      <span style="font-weight:600;font-size:0.9rem;">Document Viewer</span>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <button class="btn btn-ghost btn-sm" onclick="pdfPrevPage()" id="pdfPrevBtnOv">‹ Prev</button>
+        <span id="pdfPageInfoOv" style="font-size:0.78rem;color:var(--muted);">Page — / —</span>
+        <button class="btn btn-ghost btn-sm" onclick="pdfNextPage()" id="pdfNextBtnOv">Next ›</button>
+        <button class="btn btn-ghost btn-sm" onclick="closePdfOverlay()">✕ Close</button>
+      </div>
+    </div>
+    <div class="pdf-overlay-body">
+      <canvas id="pdfCanvasOverlay" style="max-width:100%;display:block;"></canvas>
+    </div>
+  </div>
+
   <div class="toast-wrap" id="toasts"></div>
 
-  <!-- PDF.js — must load BEFORE detail.js so pdfjsLib is available -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-
-  <!-- Shared API layer -->
   <script src="js/api.js"></script>
-  <script src="js/motion.js">
-  </script>
   <script src="js/pillnav.js"></script>
-  <!-- Detail page logic -->
+  <script src="js/motion.js"></script>
   <script src="js/detail.js"></script>
 
-  <!-- Logout handler -->
   <script>
+    function closePdfOverlay() {
+      document.getElementById("pdfOverlay").classList.remove("open");
+    }
+
     async function logout() {
-      try {
-        await apiLogout();
-      } catch { /* session may already be gone — redirect anyway */ }
+      try { await apiLogout(); } catch {}
       sessionStorage.clear();
       window.location.replace("index.html");
     }
   </script>
-
 </body>
 </html>

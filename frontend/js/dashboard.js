@@ -10,8 +10,10 @@ async function initPage() {
     applyNav(me.role);
     document.body.style.visibility = "visible";
     document.getElementById("greeting").textContent = me.full_name || me.username;
-    document.getElementById("avatarEl").textContent = (me.full_name || me.username).substring(0,2).toUpperCase();
-    document.getElementById("rolePill").textContent = me.role.charAt(0).toUpperCase() + me.role.slice(1);
+    const avatarEl = document.getElementById("avatarEl");
+    const rolePill = document.getElementById("rolePill");
+    if (avatarEl) avatarEl.textContent = (me.full_name || me.username).substring(0,2).toUpperCase();
+    if (rolePill) rolePill.textContent = me.role.charAt(0).toUpperCase() + me.role.slice(1);
   } catch {
     window.location.replace("index.html"); return;
   }

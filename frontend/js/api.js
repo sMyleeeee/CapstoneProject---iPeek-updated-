@@ -20,21 +20,21 @@ const API_BASE = "http://localhost:8000";
 /* ── Nav link sets ──────────────────────────────────────────────────── */
 const NAV_LINKS = {
   student: [
-    { href: "browse.html",  label: "Browse Research",  id: "browse"  },
-    { href: "upload.html",  label: "Submit Proposal",  id: "upload"  },
-    { href: "my-submissions.html", label: "My Submissions",    id: "my-submissions" },
+    { href: "browse.html",  label: "Browse Research",  id: "browse",    icon: "M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" },
+    { href: "upload.html",  label: "Submit Proposal",  id: "upload",    icon: "M12 4v16m8-8H4" },
+    { href: "my-submissions.html", label: "My Submissions", id: "my-submissions", icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" },
   ],
   faculty: [
-    { href: "browse.html",  label: "Browse Research",  id: "browse"  },
-    { href: "upload.html",  label: "Submit Proposal",  id: "upload"  },
-    { href: "my-submissions.html", label: "My Submissions",    id: "my-submissions" },
+    { href: "browse.html",  label: "Browse Research",  id: "browse",    icon: "M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" },
+    { href: "upload.html",  label: "Submit Proposal",  id: "upload",    icon: "M12 4v16m8-8H4" },
+    { href: "my-submissions.html", label: "My Submissions", id: "my-submissions", icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" },
   ],
   librarian: [
-    { href: "dashboard.html", label: "Dashboard",     id: "dashboard" },
-    { href: "review.html",    label: "Review Queue",  id: "review"    },
-    { href: "browse.html",    label: "Browse",        id: "browse"    },
-    { href: "upload.html",    label: "Upload",        id: "upload"    },
-    { href: "my-submissions.html", label: "My Submissions", id: "my-submissions" },
+    { href: "dashboard.html", label: "Dashboard",     id: "dashboard", icon: "M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" },
+    { href: "review.html",    label: "Review Queue",  id: "review",    icon: "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" },
+    { href: "browse.html",    label: "Browse",        id: "browse",    icon: "M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" },
+    { href: "upload.html",    label: "Upload",        id: "upload",    icon: "M12 4v16m8-8H4" },
+    { href: "my-submissions.html", label: "My Submissions", id: "my-submissions", icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" },
   ],
 };
 
@@ -44,22 +44,167 @@ function applyNav(role) {
   const links   = NAV_LINKS[role] || NAV_LINKS.student;
   const current = window.location.pathname.split("/").pop();
 
+  /* ── SVG icon helper ────────────────────────────────────── */
+  function navIcon(d) {
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("width", "16");
+    svg.setAttribute("height", "16");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("fill", "none");
+    svg.setAttribute("stroke", "currentColor");
+    svg.setAttribute("stroke-width", "2");
+    svg.setAttribute("stroke-linecap", "round");
+    svg.setAttribute("stroke-linejoin", "round");
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", d);
+    svg.appendChild(path);
+    return svg;
+  }
+
+  /* ── Desktop pill nav ──────────────────────────────────── */
+  const track = document.createElement("div");
+  track.className = "nav-track";
+
   const ul = document.createElement("ul");
   ul.className = "pill-list";
-  links.forEach(({ href, label }) => {
+  links.forEach(({ href, label, icon }) => {
     const li = document.createElement("li");
     const a  = document.createElement("a");
     a.className   = `pill${href === current ? " is-active" : ""}`;
     a.href        = href;
-    a.textContent = label;
+    if (icon) a.appendChild(navIcon(icon));
+    const span = document.createElement("span");
+    span.textContent = label;
+    a.appendChild(span);
     li.appendChild(a);
     ul.appendChild(li);
   });
+  track.appendChild(ul);
   container.innerHTML = "";
-  container.appendChild(ul);
+  container.appendChild(track);
 
-  if (typeof initPillNav === "function") initPillNav(container);
-  if (typeof applyProfilePill === "function") applyProfilePill();
+  if (typeof initPillNav === "function") initPillNav(track);
+
+  /* ── Nav right: bell + profile + logout ─────────────────── */
+  const navRight = document.querySelector(".nav-right");
+  if (navRight) {
+    /* Save references BEFORE clearing — innerHTML destroys these */
+    const existingAvatar = document.getElementById("avatarEl");
+    const existingRole   = document.getElementById("rolePill");
+
+    navRight.innerHTML = "";
+
+    /* Bell notification button */
+    const notifWrapper = document.createElement("div");
+    notifWrapper.className = "nav-notif-wrapper";
+
+    const bellBtn = document.createElement("button");
+    bellBtn.className = "nav-icon-btn";
+    bellBtn.title = "Notifications";
+    bellBtn.setAttribute("aria-label", "Notifications");
+    const bellSvg = navIcon("M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0");
+    bellBtn.appendChild(bellSvg);
+
+    const dropdown = document.createElement("div");
+    dropdown.className = "nav-dropdown";
+    dropdown.innerHTML = '<div class="notif-header">Notifications</div><div class="notif-empty">No new notifications</div>';
+
+    bellBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      dropdown.classList.toggle("open");
+    });
+
+    notifWrapper.appendChild(bellBtn);
+    notifWrapper.appendChild(dropdown);
+    navRight.appendChild(notifWrapper);
+
+    /* Close dropdown on outside click */
+    document.addEventListener("click", () => dropdown.classList.remove("open"));
+
+    /* Profile pill */
+    if (existingAvatar && existingRole) {
+      const wrapper = document.createElement("a");
+      wrapper.className = "profile-pill";
+      wrapper.href = "profile.html";
+      wrapper.appendChild(existingAvatar);
+      wrapper.appendChild(existingRole);
+      navRight.appendChild(wrapper);
+    }
+
+    /* Icon logout button */
+    const logoutBtn = document.createElement("button");
+    logoutBtn.className = "nav-icon-btn";
+    logoutBtn.title = "Sign Out";
+    logoutBtn.setAttribute("aria-label", "Sign Out");
+    const logoutSvg = navIcon("M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9");
+    logoutBtn.appendChild(logoutSvg);
+    logoutBtn.addEventListener("click", async () => {
+      try { await apiLogout(); } catch {}
+      sessionStorage.clear();
+      window.location.replace("index.html");
+    });
+    navRight.appendChild(logoutBtn);
+  }
+
+  /* ── Mobile header ─────────────────────────────────────── */
+  let mobileHeader = document.querySelector(".mobile-header");
+  if (!mobileHeader) {
+    mobileHeader = document.createElement("div");
+    mobileHeader.className = "mobile-header";
+    document.body.insertBefore(mobileHeader, document.body.firstChild);
+  }
+  mobileHeader.innerHTML = "";
+  const mBrand = document.createElement("div");
+  mBrand.className = "nav-brand";
+  mBrand.innerHTML = '<div class="nav-logo">i</div> Research Repository';
+  mobileHeader.appendChild(mBrand);
+
+  const avatarEl = document.getElementById("avatarEl");
+  const rolePill = document.getElementById("rolePill");
+  const initials = avatarEl ? avatarEl.textContent : "?";
+  const roleText = rolePill ? rolePill.textContent : role;
+  const mProfile = document.createElement("a");
+  mProfile.className = "mobile-profile-icon";
+  mProfile.href = "profile.html";
+  mProfile.textContent = initials;
+  mProfile.title = `${roleText} — View Profile`;
+  mobileHeader.appendChild(mProfile);
+
+  /* ── Bottom tab bar ────────────────────────────────────── */
+  let bottomBar = document.querySelector(".bottom-tab-bar");
+  if (!bottomBar) {
+    bottomBar = document.createElement("div");
+    bottomBar.className = "bottom-tab-bar";
+    document.body.appendChild(bottomBar);
+  }
+  bottomBar.innerHTML = "";
+
+  const bUl = document.createElement("ul");
+  bUl.className = "pill-list";
+  links.forEach(({ href, label, icon }) => {
+    const li = document.createElement("li");
+    const a  = document.createElement("a");
+    a.className   = `pill${href === current ? " is-active" : ""}`;
+    a.href        = href;
+    if (icon) a.appendChild(navIcon(icon));
+    const span = document.createElement("span");
+    const shortLabels = {
+      "Browse Research": "Browse",
+      "Submit Proposal": "Submit",
+      "My Submissions": "My Subs",
+      "Dashboard": "Home",
+      "Review Queue": "Review",
+      "Upload": "Upload",
+      "Browse": "Browse"
+    };
+    span.textContent = shortLabels[label] || label;
+    a.appendChild(span);
+    li.appendChild(a);
+    bUl.appendChild(li);
+  });
+  bottomBar.appendChild(bUl);
+
+  if (typeof initPillNav === "function") initPillNav(bottomBar);
 }
 
 function applyProfilePill() {
@@ -253,6 +398,17 @@ async function apiGaps(researchId) {
   });
   const d = await r.json();
   if (!r.ok) throw new Error(d.detail || "Gap analysis failed.");
+  return d;
+}
+
+async function apiRefineAnalysis(researchId, query, target) {
+  const r = await fetch(`${API_BASE}/ai/${researchId}/refine`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ..._authHeaders() },
+    body: JSON.stringify({ query, target }),
+  });
+  const d = await r.json();
+  if (!r.ok) throw new Error(d.detail || "Refine failed.");
   return d;
 }
 

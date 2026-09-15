@@ -6,6 +6,9 @@
 
   <title>iPeek — Sign In</title>
 
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
 </head>
 
@@ -13,245 +16,204 @@
 
   <div class="page-ambient" id="ambientBg"></div>
 
-  <div class="login-box">
+
+  <!-- ============================================================
+       SPLIT SCREEN CONTAINER
+  ============================================================= -->
+  <div class="login-container">
 
     <!-- ============================================================
-         BRAND
+         LEFT PANEL — Hero Image
     ============================================================= -->
-    <div class="login-brand">
-      <div class="login-logo">i</div>
+    <div class="login-left">
+      <div class="login-left-overlay"></div>
 
-      <h1>iPeek</h1>
+      <div class="login-left-content">
 
-      <p>Centralized Digital Repository System</p>
-    </div>
+        <div class="login-left-brand">
+          <div class="nav-logo">i</div>
+          <span>iPeek</span>
+        </div>
 
+        <div>
+          <div class="login-features">
+            <div class="login-feature-pill">AI-Assisted Analysis</div>
+            <div class="login-feature-pill">Cross-Institutional</div>
+            <div class="login-feature-pill">Open Access</div>
+          </div>
 
-    <!-- ============================================================
-         SIGN IN PANEL
-    ============================================================= -->
-    <div id="loginPanel">
+          <h2 class="login-left-headline">Research Discovery<br>Made Simple</h2>
 
-      <div class="err-box" id="loginErr"></div>
+          <p class="login-left-sub">
+            Discover, analyze, and explore research papers with AI-powered insights.
+          </p>
 
-      <label class="login-label">
-        Institutional Email
-      </label>
+          <div class="login-dots">
+            <div class="login-dot active"></div>
+            <div class="login-dot"></div>
+            <div class="login-dot"></div>
+          </div>
+        </div>
 
-      <input
-        class="login-input"
-        id="loginUid"
-        type="email"
-        placeholder="you@students.isatu.edu.ph"
-      >
-
-      <label class="login-label">
-        Password
-      </label>
-
-      <input
-        class="login-input"
-        id="loginPwd"
-        type="password"
-        placeholder="••••••••"
-      >
-
-      <!-- IMPORTANT:
-           type="button" prevents accidental form submission -->
-      <button
-        type="button"
-        class="btn-sign"
-        id="loginBtn"
-      >
-        Sign In to Repository
-      </button>
-
-      <div class="login-foot">
-        Don't have an account?
-        <a href="#" id="showRegisterLink">Create one</a>
       </div>
-
     </div>
 
 
     <!-- ============================================================
-         REGISTER PANEL
-         STEP 1: ACCOUNT DETAILS
+         RIGHT PANEL — Forms
     ============================================================= -->
-    <div id="registerPanel" style="display:none;">
+    <div class="login-right">
 
-      <div class="err-box" id="regErr"></div>
+      <!-- ============================================================
+           SIGN IN PANEL
+      ============================================================= -->
+      <div id="loginPanel">
 
-      <label class="login-label">
-        Full Name
-      </label>
+        <div class="login-welcome">Welcome back</div>
+        <h1 class="login-heading">Sign In</h1>
 
-      <input
-        class="login-input"
-        id="regFullname"
-        type="text"
-        placeholder="Juan Dela Cruz"
-      >
+        <div class="err-box" id="loginErr"></div>
 
+        <label class="login-label">Institutional Email</label>
+        <input
+          class="login-input"
+          id="loginUid"
+          type="email"
+          placeholder="you@students.isatu.edu.ph"
+        >
 
-      <label class="login-label">
-        Institutional Email
-      </label>
+        <label class="login-label">Password</label>
+        <input
+          class="login-input"
+          id="loginPwd"
+          type="password"
+          placeholder="Enter your password"
+        >
 
-      <input
-        class="login-input"
-        id="regEmail"
-        type="email"
-        placeholder="you@students.isatu.edu.ph or you@isatu.edu.ph"
-      >
+        <button
+          type="button"
+          class="btn-sign"
+          id="loginBtn"
+        >
+          Sign In to Repository
+        </button>
 
-
-      <label class="login-label">
-        Department / College
-      </label>
-
-      <select
-        class="login-input"
-        id="regDept"
-      >
-        <option value="">
-          — Select your college —
-        </option>
-
-        <option>
-          College of Engineering and Architecture
-        </option>
-
-        <option>
-          College of Computing and Informatics
-        </option>
-
-        <option>
-          College of Arts and Sciences
-        </option>
-
-        <option>
-          College of Industrial Technology
-        </option>
-
-        <option>
-          College of Education
-        </option>
-      </select>
-
-
-      <label class="login-label">
-        Password
-      </label>
-
-      <input
-        class="login-input"
-        id="regPwd"
-        type="password"
-        placeholder="Min. 8 characters"
-      >
-
-
-      <label class="login-label">
-        Confirm Password
-      </label>
-
-      <input
-        class="login-input"
-        id="regPwd2"
-        type="password"
-        placeholder="Repeat password"
-      >
-
-
-      <!-- IMPORTANT:
-           No onclick here.
-           JavaScript will attach the click event. -->
-      <button
-        type="button"
-        class="btn-sign"
-        id="sendCodeBtn"
-      >
-        Send Verification Code
-      </button>
-
-
-      <div class="login-foot">
-
-        Already have an account?
-
-        <a href="#" id="showLoginLink">
-          Sign in
-        </a>
+        <div class="login-foot">
+          Don't have an account?
+          <a href="#" id="showRegisterLink">Create one</a>
+        </div>
 
       </div>
 
-    </div>
+
+      <!-- ============================================================
+           REGISTER PANEL — STEP 1: ACCOUNT DETAILS
+      ============================================================= -->
+      <div id="registerPanel" style="display:none;">
+
+        <div class="login-welcome">Create account</div>
+        <h1 class="login-heading">Register</h1>
+
+        <div class="err-box" id="regErr"></div>
+
+        <label class="login-label">Full Name</label>
+        <input
+          class="login-input"
+          id="regFullname"
+          type="text"
+          placeholder="Juan Dela Cruz"
+        >
+
+        <label class="login-label">Institutional Email</label>
+        <input
+          class="login-input"
+          id="regEmail"
+          type="email"
+          placeholder="you@students.isatu.edu.ph or you@isatu.edu.ph"
+        >
+
+        <label class="login-label">Department / College</label>
+        <select class="login-input" id="regDept">
+          <option value="">— Select your college —</option>
+          <option>College of Engineering and Architecture</option>
+          <option>College of Computing and Informatics</option>
+          <option>College of Arts and Sciences</option>
+          <option>College of Industrial Technology</option>
+          <option>College of Education</option>
+        </select>
+
+        <label class="login-label">Password</label>
+        <input
+          class="login-input"
+          id="regPwd"
+          type="password"
+          placeholder="Min. 8 characters"
+        >
+
+        <label class="login-label">Confirm Password</label>
+        <input
+          class="login-input"
+          id="regPwd2"
+          type="password"
+          placeholder="Repeat password"
+        >
+
+        <button
+          type="button"
+          class="btn-sign"
+          id="sendCodeBtn"
+        >
+          Send Verification Code
+        </button>
+
+        <div class="login-foot">
+          Already have an account?
+          <a href="#" id="showLoginLink">Sign in</a>
+        </div>
+
+      </div>
 
 
-    <!-- ============================================================
-         OTP PANEL
-         STEP 2: VERIFY EMAIL
-    ============================================================= -->
-    <div id="otpPanel" style="display:none;">
+      <!-- ============================================================
+           OTP PANEL — STEP 2: VERIFY EMAIL
+      ============================================================= -->
+      <div id="otpPanel" style="display:none;">
 
-      <div class="err-box" id="otpErr"></div>
+        <div class="login-welcome">Verify email</div>
+        <h1 class="login-heading">Enter Code</h1>
 
+        <div class="err-box" id="otpErr"></div>
 
-      <p
-        style="
-          font-size:0.84rem;
-          color:var(--muted, #666);
-          margin-bottom:14px;
-        "
-      >
-        We sent a 6-digit code to
+        <p style="font-size:0.84rem; color:var(--muted, #666); margin-bottom:14px;">
+          We sent a 6-digit code to
+          <strong id="otpEmailDisplay"></strong>.
+          Enter it below.
+        </p>
 
-        <strong id="otpEmailDisplay"></strong>.
+        <label class="login-label">Verification Code</label>
+        <input
+          class="login-input"
+          id="otpCode"
+          type="text"
+          maxlength="6"
+          inputmode="numeric"
+          autocomplete="one-time-code"
+          placeholder="123456"
+        >
 
-        Enter it below.
-      </p>
+        <button
+          type="button"
+          class="btn-sign"
+          id="verifyBtn"
+        >
+          Verify &amp; Create Account
+        </button>
 
-
-      <label class="login-label">
-        Verification Code
-      </label>
-
-
-      <input
-        class="login-input"
-        id="otpCode"
-        type="text"
-        maxlength="6"
-        inputmode="numeric"
-        autocomplete="one-time-code"
-        placeholder="123456"
-      >
-
-
-      <!-- IMPORTANT:
-           No onclick here.
-           JavaScript will attach the click event. -->
-      <button
-        type="button"
-        class="btn-sign"
-        id="verifyBtn"
-      >
-        Verify &amp; Create Account
-      </button>
-
-
-      <div class="login-foot">
-
-        <a href="#" id="resendCodeLink">
-          Resend code
-        </a>
-
-        &nbsp;·&nbsp;
-
-        <a href="#" id="editDetailsLink">
-          Edit details
-        </a>
+        <div class="login-foot">
+          <a href="#" id="resendCodeLink">Resend code</a>
+          &nbsp;·&nbsp;
+          <a href="#" id="editDetailsLink">Edit details</a>
+        </div>
 
       </div>
 
@@ -263,216 +225,86 @@
   <!-- ============================================================
        TOAST NOTIFICATIONS
   ============================================================= -->
-  <div
-    class="toast-wrap"
-    id="toasts"
-  ></div>
+  <div class="toast-wrap" id="toasts"></div>
 
 
   <!-- ============================================================
        JAVASCRIPT
   ============================================================= -->
-
-  <!-- Shared API layer -->
   <script src="js/api.js"></script>
-
-  <!-- Login / registration / OTP logic -->
   <script src="js/login.js"></script>
 
-  <!-- Motion effects -->
-  <!-- <script src="js/motion.js"></script> -->
-
-
-  <!-- ============================================================
-       PAGE EVENT HANDLERS
-       
-       IMPORTANT:
-       We intentionally do NOT use inline onclick attributes.
-       This prevents duplicate calls and accidental form submission.
-  ============================================================= -->
   <script>
-
     document.addEventListener("DOMContentLoaded", () => {
 
-      console.log("INDEX.HTML LOADED");
-
-
-      /* ------------------------------------------------------------
-         LOGIN
-      ------------------------------------------------------------ */
-
-      const loginBtn =
-        document.getElementById("loginBtn");
-
+      const loginBtn = document.getElementById("loginBtn");
       if (loginBtn) {
-
-        loginBtn.addEventListener("click", (event) => {
-
-          event.preventDefault();
-          event.stopPropagation();
-
-          console.log("LOGIN BUTTON CLICKED");
-
+        loginBtn.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
           login();
-
         });
-
       }
 
-
-      /* ------------------------------------------------------------
-         SHOW REGISTER
-      ------------------------------------------------------------ */
-
-      const showRegisterLink =
-        document.getElementById("showRegisterLink");
-
+      const showRegisterLink = document.getElementById("showRegisterLink");
       if (showRegisterLink) {
-
-        showRegisterLink.addEventListener("click", (event) => {
-
-          event.preventDefault();
-          event.stopPropagation();
-
-          console.log("SHOW REGISTER CLICKED");
-
+        showRegisterLink.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
           showRegister();
-
         });
-
       }
 
-
-      /* ------------------------------------------------------------
-         SHOW LOGIN
-      ------------------------------------------------------------ */
-
-      const showLoginLink =
-        document.getElementById("showLoginLink");
-
+      const showLoginLink = document.getElementById("showLoginLink");
       if (showLoginLink) {
-
-        showLoginLink.addEventListener("click", (event) => {
-
-          event.preventDefault();
-          event.stopPropagation();
-
-          console.log("SHOW LOGIN CLICKED");
-
+        showLoginLink.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
           showLogin();
-
         });
-
       }
 
-
-      /* ------------------------------------------------------------
-         SEND OTP
-      ------------------------------------------------------------ */
-
-      const sendCodeBtn =
-        document.getElementById("sendCodeBtn");
-
+      const sendCodeBtn = document.getElementById("sendCodeBtn");
       if (sendCodeBtn) {
-
-        sendCodeBtn.addEventListener("click", (event) => {
-
-          event.preventDefault();
-          event.stopPropagation();
-
-          console.log("SEND OTP BUTTON CLICKED");
-
+        sendCodeBtn.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
           sendOtp();
-
         });
-
       }
 
-
-      /* ------------------------------------------------------------
-         VERIFY OTP
-      ------------------------------------------------------------ */
-
-      const verifyBtn =
-        document.getElementById("verifyBtn");
-
+      const verifyBtn = document.getElementById("verifyBtn");
       if (verifyBtn) {
-
-        verifyBtn.addEventListener("click", (event) => {
-
-          event.preventDefault();
-          event.stopPropagation();
-
-          console.log("VERIFY OTP BUTTON CLICKED");
-
+        verifyBtn.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
           verifyAndRegister();
-
         });
-
       }
 
-
-      /* ------------------------------------------------------------
-         RESEND OTP
-      ------------------------------------------------------------ */
-
-      const resendCodeLink =
-        document.getElementById("resendCodeLink");
-
+      const resendCodeLink = document.getElementById("resendCodeLink");
       if (resendCodeLink) {
-
-        resendCodeLink.addEventListener("click", (event) => {
-
-          event.preventDefault();
-          event.stopPropagation();
-
-          console.log("RESEND OTP CLICKED");
-
+        resendCodeLink.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
           sendOtp();
-
         });
-
       }
 
-
-      /* ------------------------------------------------------------
-         EDIT REGISTRATION DETAILS
-      ------------------------------------------------------------ */
-
-      const editDetailsLink =
-        document.getElementById("editDetailsLink");
-
+      const editDetailsLink = document.getElementById("editDetailsLink");
       if (editDetailsLink) {
-
-        editDetailsLink.addEventListener("click", (event) => {
-
-          event.preventDefault();
-          event.stopPropagation();
-
-          console.log("EDIT DETAILS CLICKED");
-
+        editDetailsLink.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
           showRegister();
-
         });
-
       }
-
-
-      /* ------------------------------------------------------------
-         AMBIENT BACKGROUND
-      ------------------------------------------------------------ */
 
       if (typeof initAmbientBackground === "function") {
-
-        initAmbientBackground(
-          document.getElementById("ambientBg"),
-          500
-        );
-
+        initAmbientBackground(document.getElementById("ambientBg"), 500);
       }
 
     });
-
   </script>
 
 </body>

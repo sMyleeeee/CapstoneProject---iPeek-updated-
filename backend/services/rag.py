@@ -231,6 +231,14 @@ class RAGService:
         await self._save_cache(research_id, "research_gaps", data, db)
         return data
 
+    async def refine(self, proposal: str, target: str, research_id: int, db: AsyncSession) -> dict:
+        """Re-run a specific analysis with a user-refined query. Bypasses cache."""
+        prompt_map = {"similarity": SIMILAR_PROMPT, "summary": SUMMARY_PROMPT, "gap": GAPS_PROMPT}
+        prompt = prompt_map.get(target)
+        if not prompt:
+            raise ValueError(f"Invalid refine target: {target}")
+        return await self._run(prompt, proposal, db)
+
     async def chat(self, question: str, history: list, db: AsyncSession) -> dict:
         history_text = ""
         if history:

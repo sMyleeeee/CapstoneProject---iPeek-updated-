@@ -26,8 +26,7 @@ const docId = new URLSearchParams(window.location.search).get("id");
 
 /* ── State ───────────────────────────────────────────────────────────────── */
 let paperData    = null;
-let researchId    = null;   // numeric id — needed for AI/PDF calls now
-let chatHistory   = [];
+let researchId    = null;
 
 /* PDF viewer state */
 let pdfDoc     = null;
@@ -79,6 +78,9 @@ async function initPage() {
     runSummary(),
     runGaps(),
   ]);
+
+  /* Render citation badges from similarity sources */
+  renderCitationBadges();
 
   const badge = document.getElementById("analysisStatus");
   if (badge) {
@@ -163,6 +165,19 @@ const TAB_PANELS = {
 };
 
 /**
+ * Returns the currently active tab key from the tab buttons.
+ */
+function getActiveTab() {
+  const active = document.querySelector(".tab-btn.active");
+  if (!active) return "similarity";
+  const text = active.textContent.toLowerCase();
+  if (text.includes("similarity")) return "similarity";
+  if (text.includes("summary"))    return "summary";
+  if (text.includes("gap"))        return "gaps";
+  return "similarity";
+}
+
+/**
  * Switches the active AI-analysis tab.
  * @param {string} tab - one of "similarity" | "summary" | "gaps"
  * @param {HTMLElement} el - the tab button that was clicked
@@ -180,13 +195,83 @@ function switchTab(tab, el) {
   if (target) target.style.display = "block";
 }
 
+/* ── Refine analysis ─────────────────────────────────────────────────────── */
+
+async function refineAnalysis() {
+  const input = document.getElementById("refineInput");
+  const btn   = document.getElementById("refineBtn");
+  const query = input ? input.value.trim() : "";
+  if (!query) {
+    toast("Please enter a query to refine the analysis.", "warning");
+    return;
+  }
+  if (!researchId) {
+    toast("Paper not loaded yet.", "error");
+    return;
+  }
+
+  /* Determine target: use dropdown or fall back to active tab */
+  const select = document.getElementById("refineTarget");
+  let target = select ? select.value : "auto";
+  if (target === "auto") target = getActiveTab();
+  /* Map tab key to backend target */
+  if (target === "gaps") target = "gap";
+
+  /* Show running state */
+  const badge = document.getElementById("analysisStatus");
+  if (badge) {
+    badge.textContent = "Running...";
+    badge.className   = "badge badge-pending";
+  }
+
+  btn.disabled    = true;
+  btn.textContent = "Refining...";
+
+  try {
+    const data = await apiRefineAnalysis(researchId, query, target);
+
+    /* Update the relevant tab content */
+    if (target === "similarity") {
+      renderSimilarityBars(data.result);
+      lastSimilaritySources = data.sources || [];
+      renderCitationBadges();
+    } else if (target === "summary") {
+      const box = document.getElementById("summaryBox");
+      if (box) box.textContent = data.result.replace(/\*\*/g, "");
+    } else if (target === "gap") {
+      renderGapsList(data.result);
+    }
+
+    /* Switch to the refined tab if not already active */
+    const tabKey = target === "gap" ? "gaps" : target;
+    const tabBtn = document.querySelector(`.tab-btn[onclick*="${tabKey}"]`);
+    if (tabBtn && !tabBtn.classList.contains("active")) {
+      switchTab(tabKey, tabBtn);
+    }
+
+    input.value = "";
+    toast("Analysis refined.", "success");
+  } catch (e) {
+    toast(`Refine failed: ${e.message}`, "error");
+  } finally {
+    btn.disabled    = false;
+    btn.textContent = "Refine";
+    if (badge) {
+      badge.textContent = "Complete";
+      badge.className   = "badge badge-validated";
+    }
+  }
+}
+
 /* ── AI Analysis — now called with researchId, not a query string ─────── */
+
+let lastSimilaritySources = [];
 
 async function runSimilarity() {
   try {
     const data = await apiSimilarity(researchId);
     renderSimilarityBars(data.result);
-    renderSimilarProjects(data.sources);
+    lastSimilaritySources = data.sources || [];
   } catch (e) {
     const el = document.getElementById("simBars");
     if (el) {
@@ -196,7 +281,7 @@ async function runSimilarity() {
       msg.textContent = `⚠️ Similarity failed: ${e.message}`;
       el.appendChild(msg);
     }
-    renderSimilarProjects([]);
+    lastSimilaritySources = [];
   }
 }
 
@@ -334,47 +419,22 @@ function renderSimilarityBars(text) {
 }
 
 /**
- * Renders the structured (non-LLM-generated) source list into the
- * right-panel "Similar Projects" card.
- * @param {Array} sources - [{title, authors, year, college, pages}, ...]
+ * Renders citation badges from the similarity sources list.
+ * These appear below the similarity bars in the Similarity Report tab.
  */
-function renderSimilarProjects(sources) {
-  const container = document.getElementById("similarProjects");
+function renderCitationBadges() {
+  const container = document.getElementById("citationBadges");
   if (!container) return;
   container.innerHTML = "";
 
-  if (!sources || sources.length === 0) {
-    const empty = document.createElement("div");
-    empty.style.cssText = "color:var(--muted);font-size:0.8rem;";
-    empty.textContent = "No similar projects found.";
-    container.appendChild(empty);
-    return;
-  }
+  if (!lastSimilaritySources || lastSimilaritySources.length === 0) return;
 
-  sources.forEach(s => {
-    const card = document.createElement("div");
-    card.style.cssText = "padding:10px 0;border-bottom:1px solid var(--border,#eee);";
-
-    const title = document.createElement("div");
-    title.style.cssText = "font-weight:600;font-size:0.82rem;margin-bottom:3px;";
-    title.textContent = s.title || "Untitled";
-
-    const meta = document.createElement("div");
-    meta.style.cssText = "font-size:0.74rem;color:var(--muted);";
-    const bits = [s.authors, s.year, s.college].filter(v => v && v !== "Unknown");
-    meta.textContent = bits.join(" · ");
-
-    card.appendChild(title);
-    card.appendChild(meta);
-
-    if (s.pages && s.pages.length) {
-      const pages = document.createElement("div");
-      pages.style.cssText = "font-size:0.72rem;color:var(--muted);margin-top:3px;";
-      pages.textContent = `Pages: ${s.pages.join(", ")}`;
-      card.appendChild(pages);
-    }
-
-    container.appendChild(card);
+  lastSimilaritySources.forEach(s => {
+    const badge = document.createElement("span");
+    badge.className = "citation-badge citation-pop";
+    const bits = [s.title, s.year].filter(v => v && v !== "Unknown");
+    badge.textContent = bits.join(", ") || "Untitled";
+    container.appendChild(badge);
   });
 }
 
@@ -452,74 +512,24 @@ function renderGapsList(text) {
   });
 }
 
-/* ── Chat ────────────────────────────────────────────────────────────────── */
-
-/**
- * Appends a chat bubble and returns the bubble element (so callers can
- * update its text later, e.g. to replace a "thinking..." placeholder).
- * @param {string} role - "user" | "bot"
- * @param {string} text
- * @returns {HTMLElement} the bubble element
- */
-function appendChatMessage(role, text) {
-  const log = document.getElementById("chatLog");
-  if (!log) return document.createElement("div");
-
-  const msg = document.createElement("div");
-  msg.className = `chat-msg ${role}`;
-
-  const bubble = document.createElement("div");
-  bubble.className   = "chat-bubble";
-  bubble.textContent = text;
-
-  msg.appendChild(bubble);
-  log.appendChild(msg);
-  log.scrollTop = log.scrollHeight;
-  return bubble;
-}
-
-/**
- * Enter sends the message, Shift+Enter inserts a newline.
- * @param {KeyboardEvent} e
- */
-function chatKey(e) {
-  if (e.key === "Enter" && !e.shiftKey) {
-    e.preventDefault();
-    sendChat();
-  }
-}
-
-async function sendChat() {
-  const input = document.getElementById("chatInput");
-  if (!input) return;
-
-  const question = input.value.trim();
-  if (!question) return;
-
-  input.value = "";
-  appendChatMessage("user", question);
-  chatHistory.push({ role: "user", content: question });
-
-  const thinkingBubble = appendChatMessage("bot", "…");
-
-  try {
-    const data = await apiChat(question, chatHistory);
-    thinkingBubble.textContent = data.result;
-    chatHistory.push({ role: "assistant", content: data.result });
-  } catch (e) {
-    thinkingBubble.textContent = `⚠️ ${e.message}`;
-  }
-}
-
 /* ── PDF viewer ──────────────────────────────────────────────────────────── */
 
 async function revealPdfViewer() {
-  const card    = document.getElementById("pdfViewerCard");
-  const trigger = document.getElementById("pdfViewerTrigger");
-  if (!card) return;
+  const isMobile = window.innerWidth <= 768;
 
-  card.style.display    = "block";
-  if (trigger) trigger.style.display = "none";
+  if (isMobile) {
+    /* Mobile: open full-screen PDF overlay */
+    const overlay = document.getElementById("pdfOverlay");
+    if (overlay) overlay.classList.add("open");
+  } else {
+    /* Desktop: show inline PDF viewer card */
+    const card    = document.getElementById("pdfViewerCard");
+    const trigger = document.getElementById("pdfViewerTrigger");
+    if (!card) return;
+    card.style.display    = "block";
+    if (trigger) trigger.style.display = "none";
+  }
+
   pdfVisible = true;
 
   if (pdfDoc) {
@@ -566,7 +576,9 @@ async function renderPdfPage(num) {
   if (!pdfDoc) return;
   pdfPage = num;
 
-  const canvas = document.getElementById("pdfCanvas");
+  const isMobile = window.innerWidth <= 768;
+  const canvasId = isMobile ? "pdfCanvasOverlay" : "pdfCanvas";
+  const canvas = document.getElementById(canvasId);
   if (!canvas) return;
 
   try {
@@ -585,9 +597,14 @@ async function renderPdfPage(num) {
 }
 
 function updatePageInfo() {
-  const info    = document.getElementById("pdfPageInfo");
-  const prevBtn = document.getElementById("pdfPrevBtn");
-  const nextBtn = document.getElementById("pdfNextBtn");
+  const isMobile = window.innerWidth <= 768;
+  const infoId   = isMobile ? "pdfPageInfoOv" : "pdfPageInfo";
+  const prevId   = isMobile ? "pdfPrevBtnOv"  : "pdfPrevBtn";
+  const nextId   = isMobile ? "pdfNextBtnOv"  : "pdfNextBtn";
+
+  const info    = document.getElementById(infoId);
+  const prevBtn = document.getElementById(prevId);
+  const nextBtn = document.getElementById(nextId);
 
   if (info) {
     info.textContent = pdfDoc ? `Page ${pdfPage} / ${pdfDoc.numPages}` : "Page — / —";
@@ -604,11 +621,22 @@ function pdfNextPage() {
   if (pdfDoc && pdfPage < pdfDoc.numPages) renderPdfPage(pdfPage + 1);
 }
 
+function closePdfOverlay() {
+  const overlay = document.getElementById("pdfOverlay");
+  if (overlay) overlay.classList.remove("open");
+}
+
 function hidePdfViewer() {
-  const card    = document.getElementById("pdfViewerCard");
-  const trigger = document.getElementById("pdfViewerTrigger");
-  if (card) card.style.display = "none";
-  if (trigger) trigger.style.display = "block";
+  const isMobile = window.innerWidth <= 768;
+
+  if (isMobile) {
+    closePdfOverlay();
+  } else {
+    const card    = document.getElementById("pdfViewerCard");
+    const trigger = document.getElementById("pdfViewerTrigger");
+    if (card) card.style.display = "none";
+    if (trigger) trigger.style.display = "block";
+  }
   pdfVisible = false;
 }
 

@@ -4,22 +4,18 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>iPeek — Browse Research</title>
-  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
 </head>
-<!-- visibility:hidden prevents role flash — set to visible by initPage()
-     after apiMe() confirms the session and renders the correct nav -->
 <body style="visibility:hidden;">
   <nav class="navbar">
     <div class="nav-brand">
       <div class="nav-logo">i</div>
       Research Repository
     </div>
-    <!-- nav-links content is overwritten by browse.js based on real role -->
-    <div class="nav-links">
-      <a class="nav-link active" href="browse.html">Browse Research</a>
-      <a class="nav-link" href="upload.html">Submit Proposal</a>
-    </div>
+    <div class="nav-links"></div>
     <div class="nav-right">
       <a href="profile.html" class="avatar" id="avatarEl" title="View Profile"></a>
       <span class="role-pill" id="rolePill"></span>
@@ -27,13 +23,53 @@
     </div>
   </nav>
 
-  <!-- Two-column layout: sidebar + main content -->
+  <!-- Mobile filter FAB -->
+  <button class="filter-fab" id="filterFab" onclick="openFilterSheet()">⚙</button>
+
+  <!-- Glass filter bottom sheet (mobile) -->
+  <div class="glass-sheet-overlay" id="filterOverlay" onclick="closeFilterSheet()"></div>
+  <div class="glass-sheet" id="filterSheet">
+    <div class="glass-sheet-handle"></div>
+    <div class="glass-sheet-title">Filters</div>
+
+    <div class="sb-section">
+      <span class="sb-label">Research Status</span>
+      <button class="sb-item active" onclick="setFilter('status','all',this); closeFilterSheet();">
+        All Projects <span class="sb-count" id="cntAllM">0</span>
+      </button>
+      <button class="sb-item" onclick="setFilter('status','approved',this); closeFilterSheet();">
+        Approved <span class="sb-count" id="cntApprovedM">0</span>
+      </button>
+      <button class="sb-item" onclick="setFilter('status','ongoing',this); closeFilterSheet();">
+        Ongoing <span class="sb-count" id="cntOngoingM">0</span>
+      </button>
+      <button class="sb-item" onclick="setFilter('status','rejected',this); closeFilterSheet();">
+        Rejected <span class="sb-count" id="cntRejectedM">0</span>
+      </button>
+    </div>
+
+    <div class="sb-section">
+      <span class="sb-label">Colleges</span>
+      <button class="sb-item" onclick="setFilter('college','CAS',this); closeFilterSheet();">CAS</button>
+      <button class="sb-item" onclick="setFilter('college','CCI',this); closeFilterSheet();">CCI</button>
+      <button class="sb-item" onclick="setFilter('college','CEA',this); closeFilterSheet();">CEA</button>
+      <button class="sb-item" onclick="setFilter('college','CIT',this); closeFilterSheet();">CIT</button>
+      <button class="sb-item" onclick="setFilter('college','COE',this); closeFilterSheet();">COE</button>
+    </div>
+
+    <div class="sb-section">
+      <span class="sb-label">Technology</span>
+      <button class="sb-item" onclick="setFilter('tag','Machine Learning',this); closeFilterSheet();">Machine Learning</button>
+      <button class="sb-item" onclick="setFilter('tag','Web Development',this); closeFilterSheet();">Web Development</button>
+      <button class="sb-item" onclick="setFilter('tag','Mobile App',this); closeFilterSheet();">Mobile App</button>
+      <button class="sb-item" onclick="setFilter('tag','IoT',this); closeFilterSheet();">IoT</button>
+      <button class="sb-item" onclick="setFilter('tag','Computer Vision',this); closeFilterSheet();">Computer Vision</button>
+    </div>
+  </div>
+
   <div class="layout">
-
-    <!-- Left filter sidebar -->
+    <!-- Left filter sidebar (desktop) -->
     <div class="sidebar">
-
-      <!-- Research status counts -->
       <div class="sb-section">
         <span class="sb-label">Research Status</span>
         <button class="sb-item active" onclick="setFilter('status','all',this)">
@@ -50,7 +86,6 @@
         </button>
       </div>
 
-      <!-- College filters -->
       <div class="sb-section">
         <span class="sb-label">Colleges</span>
         <button class="sb-item" onclick="setFilter('college','CAS',this)">CAS</button>
@@ -60,7 +95,6 @@
         <button class="sb-item" onclick="setFilter('college','COE',this)">COE</button>
       </div>
 
-      <!-- Technology / keyword filters -->
       <div class="sb-section">
         <span class="sb-label">Technology</span>
         <button class="sb-item" onclick="setFilter('tag','Machine Learning',this)">Machine Learning</button>
@@ -69,13 +103,10 @@
         <button class="sb-item" onclick="setFilter('tag','IoT',this)">IoT</button>
         <button class="sb-item" onclick="setFilter('tag','Computer Vision',this)">Computer Vision</button>
       </div>
-
     </div>
 
     <!-- Main content area -->
     <div class="main">
-
-      <!-- Hero banner -->
       <div class="hero">
         <div>
           <h2>Explore ISAT-U Research</h2>
@@ -84,14 +115,11 @@
         <span class="badge badge-validated">ISAT-U Main Campus</span>
       </div>
 
-      <!-- Search input -->
-      <div class="search-wrap" style="margin-bottom:14px;">
+      <div class="search-wrap mb-md">
         <span class="search-icon">🔍</span>
-        <input type="text" id="searchInput"
-               placeholder="Title, author, keyword, or technology...">
+        <input type="text" id="searchInput" placeholder="Title, author, keyword, or technology...">
       </div>
 
-      <!-- Year filter pills -->
       <div class="year-pills">
         <button class="year-pill active" onclick="setYear('all',this)">All Years</button>
         <button class="year-pill" onclick="setYear('2024',this)">2024</button>
@@ -99,42 +127,41 @@
         <button class="year-pill" onclick="setYear('2022',this)">2022</button>
       </div>
 
-      <!-- Result count — updated by browse.js -->
       <div class="results-bar">
         <span id="resultsCount">Loading...</span>
       </div>
 
-      <!-- Research card grid — populated by browse.js -->
       <div class="research-grid" id="grid"></div>
 
-      <!-- Empty state — shown when filters return no results -->
-      <div id="empty" style="display:none;text-align:center;padding:60px 0;color:var(--muted);">
-        <div style="font-size:2rem;margin-bottom:10px;">📭</div>
+      <div id="empty" class="empty-state" style="display:none;">
+        <div class="empty-state-icon">📭</div>
         <p>No research found. Try adjusting your filters.</p>
       </div>
 
-      <!-- Loading state — shown while fetching from API -->
-      <div id="loading" style="text-align:center;padding:60px 0;color:var(--muted);">
-        <div class="spinner" style="margin:0 auto 12px;width:28px;height:28px;"></div>
+      <div id="loading" class="text-center" style="padding:60px 0;color:var(--muted);">
+        <div class="spinner spinner-lg" style="margin:0 auto 12px;"></div>
         <p>Loading repository...</p>
       </div>
-
     </div>
   </div>
 
   <div class="toast-wrap" id="toasts"></div>
-  <script src="js/motion.js"></script>
-  <script>
-  if (document.getElementById("ambientBg")) {
-    initAmbientBackground(document.getElementById("ambientBg"), 34, AMBIENT_LIGHT_PALETTE);
-  }
-</script>
+
   <script src="js/api.js"></script>
-  <script src="js/pillnav.js?v=2"></script>
+  <script src="js/pillnav.js"></script>
+  <script src="js/motion.js"></script>
   <script src="js/browse.js"></script>
 
-  <!-- Logout — clears real Flask session + sessionStorage then redirects -->
   <script>
+    function openFilterSheet() {
+      document.getElementById("filterOverlay").classList.add("open");
+      document.getElementById("filterSheet").classList.add("open");
+    }
+    function closeFilterSheet() {
+      document.getElementById("filterOverlay").classList.remove("open");
+      document.getElementById("filterSheet").classList.remove("open");
+    }
+
     async function logout() {
       try { await apiLogout(); } catch {}
       sessionStorage.clear();

@@ -28,8 +28,10 @@ async function initPage() {
     currentUserRole = me.role;
     applyNav(me.role);
     document.body.style.visibility = "visible";
-    document.getElementById("avatarEl").textContent = (me.full_name || me.username).substring(0,2).toUpperCase();
-    document.getElementById("rolePill").textContent = me.role.charAt(0).toUpperCase() + me.role.slice(1);
+    const avatarEl = document.getElementById("avatarEl");
+    const rolePill = document.getElementById("rolePill");
+    if (avatarEl) avatarEl.textContent = (me.full_name || me.username).substring(0,2).toUpperCase();
+    if (rolePill) rolePill.textContent = me.role.charAt(0).toUpperCase() + me.role.slice(1);
   } catch {
     window.location.replace("index.html"); return;
   }
@@ -168,7 +170,7 @@ async function confirmBulkDelete() {
   selectedIds.clear();
   currentId = null;
   document.getElementById("detailPanel").innerHTML =
-    "<div class='empty-detail'><div class='icon'>📋</div><p style='font-weight:600;margin-bottom:4px;'>No submission selected</p><p style='font-size:0.8rem;'>Click a submission on the left to review it.</p></div>";
+    "<div class='empty-detail'><div class='icon'>📋</div><p class='empty-detail-title'>No submission selected</p><p class='empty-detail-sub'>Click a submission on the left to review it.</p></div>";
 
   await loadSubmissions();
   updateBulkBar();
@@ -181,7 +183,11 @@ function selectSubmission(id) {
   renderList();
 
   const panel = document.getElementById("detailPanel");
-  panel.innerHTML = "";
+  const sheetContent = document.getElementById("reviewSheetContent");
+  const isMobile = window.innerWidth <= 768;
+
+  const target = isMobile ? sheetContent : panel;
+  if (!isMobile) panel.innerHTML = "";
 
   const titleEl = document.createElement("div");
   titleEl.className   = "detail-title";
@@ -189,6 +195,7 @@ function selectSubmission(id) {
 
   const authorEl = document.createElement("div");
   authorEl.className   = "detail-author";
+  authorEl.style.cssText = "font-size:0.84rem;color:var(--muted);margin-bottom:8px;";
   authorEl.textContent = s.lead_researcher || "Unknown";
 
   const chips = document.createElement("div");
@@ -210,11 +217,11 @@ function selectSubmission(id) {
   absCard.style.marginBottom = "14px";
 
   const absLabel = document.createElement("div");
-  absLabel.className   = "detail-section-lbl";
+  absLabel.className   = "section-label";
   absLabel.textContent = "Abstract";
 
   const absText = document.createElement("p");
-  absText.className   = "detail-abstract";
+  absText.className   = "abstract-text";
   absText.textContent = s.abstract || "No abstract provided.";
 
   absCard.appendChild(absLabel);
@@ -222,13 +229,14 @@ function selectSubmission(id) {
 
   const aiNotice = document.createElement("div");
   aiNotice.className   = "ai-notice";
-  aiNotice.textContent = "🤖 AI Similarity analysis will run after approval.";
+  aiNotice.textContent = "AI Similarity analysis will run after approval.";
 
   const fbCard = document.createElement("div");
-  fbCard.className = "card feedback-card";
+  fbCard.className = "card";
+  fbCard.style.marginBottom = "14px";
 
   const fbLabel = document.createElement("div");
-  fbLabel.className   = "detail-section-lbl";
+  fbLabel.className   = "section-label";
   fbLabel.textContent = "Librarian Feedback";
 
   const fbTextarea = document.createElement("textarea");
@@ -244,12 +252,9 @@ function selectSubmission(id) {
   const actionRow = document.createElement("div");
   actionRow.className = "action-row";
 
-  // View PDF — verify the actual submitted document before deciding.
-  // Works regardless of status (pending/returned/approved) now that
-  // the backend allows librarians to view any status's PDF.
   const viewPdfBtn = document.createElement("button");
   viewPdfBtn.className   = "btn btn-ghost";
-  viewPdfBtn.textContent = "📄 View PDF";
+  viewPdfBtn.textContent = "View PDF";
   viewPdfBtn.addEventListener("click", () => {
     if (!s.source_stem) {
       toast("No document available for this submission.", "error");
@@ -262,35 +267,36 @@ function selectSubmission(id) {
   if (currentUserRole === "librarian") {
     const deleteBtn = document.createElement("button");
     deleteBtn.className   = "btn btn-danger";
-    deleteBtn.textContent = "🗑 Delete";
+    deleteBtn.textContent = "Delete";
     deleteBtn.addEventListener("click", () => deletePaperFromDetail(s.id, s.title));
     actionRow.appendChild(deleteBtn);
   }
 
   const returnBtn = document.createElement("button");
   returnBtn.className   = "btn btn-ghost";
-  returnBtn.textContent = "↩ Return";
+  returnBtn.textContent = "Return";
   returnBtn.addEventListener("click", () => returnSubmission(s.id));
 
   const validateBtn = document.createElement("button");
   validateBtn.className   = "btn btn-success";
-  validateBtn.textContent = "✅ Validate";
+  validateBtn.textContent = "Validate";
   validateBtn.addEventListener("click", () => validateSubmission(s.id));
 
   actionRow.appendChild(returnBtn);
   actionRow.appendChild(validateBtn);
 
-  const header = document.createElement("div");
-  header.className = "detail-header";
-  header.appendChild(titleEl);
-  header.appendChild(authorEl);
-  header.appendChild(chips);
+  target.appendChild(titleEl);
+  target.appendChild(authorEl);
+  target.appendChild(chips);
+  target.appendChild(absCard);
+  target.appendChild(aiNotice);
+  target.appendChild(fbCard);
+  target.appendChild(actionRow);
 
-  panel.appendChild(header);
-  panel.appendChild(absCard);
-  panel.appendChild(aiNotice);
-  panel.appendChild(fbCard);
-  panel.appendChild(actionRow);
+  /* On mobile, open the glass detail sheet */
+  if (isMobile && typeof openReviewSheet === "function") {
+    openReviewSheet();
+  }
 }
 
 /* ── Actions — now ONE call each, via apiValidateResearch ────────────── */
@@ -309,7 +315,7 @@ async function validateSubmission(id) {
     currentId = null;
     await loadSubmissions();
     document.getElementById("detailPanel").innerHTML =
-      "<div class='empty-detail'><div class='icon'>✅</div><p style='font-weight:600;'>Submission validated.</p></div>";
+      "<div class='empty-detail'><div class='icon'>✅</div><p class='empty-detail-title'>Submission validated.</p></div>";
   } catch (e) {
     toast(`Validation failed: ${e.message}`, "error");
     if (validateBtn) validateBtn.disabled = false;
@@ -335,7 +341,7 @@ async function returnSubmission(id) {
     currentId = null;
     await loadSubmissions();
     document.getElementById("detailPanel").innerHTML =
-      "<div class='empty-detail'><div class='icon'>↩️</div><p style='font-weight:600;'>Submission returned to student.</p></div>";
+      "<div class='empty-detail'><div class='icon'>↩️</div><p class='empty-detail-title'>Submission returned to student.</p></div>";
   } catch (e) {
     toast(`Return failed: ${e.message}`, "error");
     if (validateBtn) validateBtn.disabled = false;
@@ -358,7 +364,7 @@ async function deletePaperFromDetail(id, title) {
     selectedIds.delete(id);
     await loadSubmissions();
     document.getElementById("detailPanel").innerHTML =
-      "<div class='empty-detail'><div class='icon'>🗑️</div><p style='font-weight:600;'>Submission deleted.</p></div>";
+      "<div class='empty-detail'><div class='icon'>🗑️</div><p class='empty-detail-title'>Submission deleted.</p></div>";
     updateBulkBar();
   } catch (e) {
     toast(`Delete failed: ${e.message}`, "error");

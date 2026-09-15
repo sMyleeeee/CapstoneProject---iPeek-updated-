@@ -4,41 +4,34 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>iPeek — Dashboard</title>
-  <!-- All styles from style.css — no inline styles -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body style="visibility:hidden;">
-  <!-- Top navigation bar -->
   <nav class="navbar">
     <div class="nav-brand">
       <div class="nav-logo">i</div>
       Research Repository
     </div>
-    <div class="nav-links">
-      <a class="nav-link active" href="dashboard.html">Dashboard</a>
-      <a class="nav-link" href="review.html">Review Queue</a>
-      <a class="nav-link" href="browse.html">Browse</a>
-      <a class="nav-link" href="upload.html">Upload</a>
-    </div>
+    <div class="nav-links"></div>
     <div class="nav-right">
-    <a href="profile.html" class="avatar" id="avatarEl" title="View Profile"></a>
-    <span class="role-pill" id="rolePill"></span>
-    <button class="btn btn-ghost btn-sm" onclick="logout()">Sign Out</button>
-  </div>
+      <a href="profile.html" class="avatar" id="avatarEl" title="View Profile"></a>
+      <span class="role-pill" id="rolePill"></span>
+      <button class="btn btn-ghost btn-sm" onclick="logout()">Sign Out</button>
+    </div>
   </nav>
 
-  <!-- Page body -->
-  <div class="main">
+  <div class="main" style="max-width:1100px;margin:0 auto;">
 
-    <!-- Greeting -->
-    <div style="margin-bottom:20px;">
-      <p class="text-muted" style="font-size:0.8rem;">Good morning,</p>
-      <!-- User's name — filled by dashboard.js -->
+    <div class="mb-lg">
+      <p class="text-muted greeting-sub">Good morning,</p>
       <h2 id="greeting"></h2>
     </div>
 
-    <!-- Stat cards row -->
-    <div class="stat-grid">
+    <!-- Stat cards — uses class for mobile horizontal scroll -->
+    <div class="stat-grid stat-grid-mobile">
       <div class="stat-card">
         <div class="stat-num" id="statTotal">—</div>
         <div class="stat-lbl">Total Research</div>
@@ -57,58 +50,44 @@
       </div>
     </div>
 
-    <!-- Bottom two-column section -->
     <div class="dash-grid">
-
-      <!-- Recent submissions list -->
       <div class="card">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+        <div class="card-header-row">
           <h3>Recent Submissions</h3>
-          <a href="review.html" style="font-size:0.78rem;color:var(--info);">View all →</a>
+          <a href="review.html" class="view-all-link">View all →</a>
         </div>
-        <!-- Populated by dashboard.js -->
         <div id="recentList"></div>
       </div>
 
-      <!-- Quick actions panel -->
       <div class="card">
-        <h3 style="margin-bottom:14px;">Quick Actions</h3>
-
-        <!-- Action required alert -->
+        <h3 class="mb-md">Quick Actions</h3>
         <div class="action-alert">
           <div class="action-alert-title">Action Required</div>
-          <!-- Pending count message — filled by dashboard.js -->
           <div class="action-alert-body" id="pendingMsg">Loading...</div>
         </div>
-
-        <!-- Quick action buttons grid -->
         <div class="quick-actions">
-          <button class="btn btn-primary" onclick="location.href='review.html'">✅ Validate Research</button>
-          <button class="btn btn-ghost"   onclick="location.href='upload.html'">📤 Upload Study</button>
-          <button class="btn btn-ghost"   onclick="location.href='browse.html'">🔍 Search Repo</button>
-          <button class="btn btn-ghost"   onclick="location.href='profile.html'">👤 Edit Profile</button>
+          <button class="btn btn-primary" onclick="location.href='review.html'">Validate Research</button>
+          <button class="btn btn-ghost" onclick="location.href='upload.html'">Upload Study</button>
+          <button class="btn btn-ghost" onclick="location.href='browse.html'">Search Repo</button>
+          <button class="btn btn-ghost" onclick="location.href='profile.html'">Edit Profile</button>
         </div>
       </div>
-
     </div>
   </div>
 
-  <!-- Toast notification container -->
   <div class="toast-wrap" id="toasts"></div>
 
-  <!-- Shared API layer -->
   <script src="js/api.js"></script>
-  <script src="js/motion.js">
-  </script>
   <script src="js/pillnav.js"></script>
-  <!-- Dashboard page logic -->
+  <script src="js/motion.js"></script>
   <script src="js/dashboard.js"></script>
+
   <script>
     async function logout() {
       try { await apiLogout(); } catch {}
       sessionStorage.clear();
       window.location.replace("index.html");
     }
-    </script>
- </body>
+  </script>
+</body>
 </html>

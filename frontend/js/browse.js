@@ -235,6 +235,11 @@ function updateCounts() {
   set("cntApproved", total);
   set("cntOngoing",  0);
   set("cntRejected", 0);
+  /* Mobile filter sheet counts */
+  set("cntAllM",      total);
+  set("cntApprovedM", total);
+  set("cntOngoingM",  0);
+  set("cntRejectedM", 0);
 }
 
 /* ── Filter handlers ─────────────────────────────────────────────────────── */
