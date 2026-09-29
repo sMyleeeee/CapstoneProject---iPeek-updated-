@@ -48,6 +48,12 @@ async function initPage() {
     console.error("applyNav failed:", e);
   }
 
+  const name     = me.full_name || me.username || "User";
+  const avatarEl = document.getElementById("avatarEl");
+  const rolePill = document.getElementById("rolePill");
+  if (avatarEl) avatarEl.textContent = name.substring(0, 2).toUpperCase();
+  if (rolePill) rolePill.textContent = me.role.charAt(0).toUpperCase() + me.role.slice(1);
+
   document.body.style.visibility = "visible";
 }
 

@@ -17,14 +17,15 @@
 function initPillNav(container) {
   if (!container) return;
 
-  let indicator = container.querySelector(".pill-indicator");
-  if (!indicator) {
-    indicator = document.createElement("div");
-    indicator.className = "pill-indicator";
+ let indicator = container.querySelector(".pill-indicator");
+if (!indicator) {
+  indicator = document.createElement("div");
+  indicator.className = "pill-indicator";
+  if (getComputedStyle(container).position === "static") {
     container.style.position = "relative";
-    container.insertBefore(indicator, container.firstChild);
   }
-
+  container.insertBefore(indicator, container.firstChild);
+}
   const links = container.querySelectorAll("a.pill");
   const activeLink = container.querySelector("a.pill.is-active") || links[0];
 
