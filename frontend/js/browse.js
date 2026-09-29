@@ -220,6 +220,8 @@ function render() {
     card.appendChild(tagsEl);
     grid.appendChild(card);
   });
+
+  staggerIn(grid); // subtle staggered fade-in, from motion.js
 }
 
 /**

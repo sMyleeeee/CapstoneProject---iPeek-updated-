@@ -123,6 +123,8 @@ function renderList() {
     item.appendChild(content);
     list.appendChild(item);
   });
+
+  staggerIn(list); // subtle staggered fade-in, from motion.js
 }
 
 function toggleSelect(id, checked) {

@@ -5,7 +5,7 @@
    ============================================================= */
 
 /* ── Reset ────────────────────────────────────────────────── */
-*, *::before, *after { box-sizing: border-box; margin: 0; padding: 0; }
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
   /* Cream base */
@@ -19,6 +19,7 @@
   --accent:      #F5C518;
   --accent-dk:   #D4A800;
   --orange:      #FF8C42;
+  --field-fill:  #E5DCCD;
 
   /* Semantic */
   --text:        #1a1a2e;
@@ -34,10 +35,20 @@
   --font-sans:   'Inter', 'Segoe UI', sans-serif;
 
   /* Shadows — warm, soft */
-  --shadow-sm:   0 1px 3px rgba(0,0,0,0.04);
-  --shadow:      0 2px 12px rgba(0,0,0,0.06);
-  --shadow-md:   0 4px 20px rgba(0,0,0,0.08);
-  --shadow-lg:   0 8px 32px rgba(0,0,0,0.10);
+  /* Retinted to neomorphic dual-directional shadows (light
+     top-left, dark bottom-right) instead of flat single-direction
+     shadows — plus two new inset variants for pressed/active
+     states, which didn't exist in this system before. */
+  /* Tint channels (R,G,B) — change these two lines to retint every shadow */
+  --sh-dark:     150,124,92;
+  --sh-light:    255,255,255;
+
+  --shadow-sm:   2px 2px 4px rgba(var(--sh-dark),0.28), -2px -2px 4px rgba(var(--sh-light),0.95);
+  --shadow:      4px 4px 8px rgba(var(--sh-dark),0.30), -4px -4px 8px rgba(var(--sh-light),0.95);
+  --shadow-md:   6px 6px 12px rgba(var(--sh-dark),0.32), -6px -6px 12px rgba(var(--sh-light),0.95);
+  --shadow-lg:   10px 10px 20px rgba(var(--sh-dark),0.34), -10px -10px 20px rgba(var(--sh-light),0.95);
+  --shadow-inset:    inset 3px 3px 6px rgba(var(--sh-dark),0.32), inset -3px -3px 6px rgba(var(--sh-light),0.95);
+  --shadow-inset-sm: inset 2px 2px 4px rgba(var(--sh-dark),0.30), inset -2px -2px 4px rgba(var(--sh-light),0.9);
 
   /* Radius */
   --radius:      16px;
@@ -64,7 +75,7 @@ body {
 a    { text-decoration: none; color: inherit; }
 button, input, textarea, select { font-family: inherit; cursor: pointer; }
 
-h1, h2, h3 { font-family: var(--font-serif); color: var(--text); }
+h1, h2, h3 { font-family: var(--font-serif); color: var(--text); letter-spacing: -0.01em; line-height: 1.25; }
 
 /* ── Navbar — Full-width flat bar ─────────────────────────── */
 .navbar {
@@ -424,6 +435,7 @@ h1, h2, h3 { font-family: var(--font-serif); color: var(--text); }
   background: rgba(245, 197, 24, 0.12);
   color: var(--primary);
   font-weight: 600;
+  box-shadow: var(--shadow-inset-sm); /* pressed feel, added in the neomorphic retint */
 }
 
 .sb-count {
@@ -727,7 +739,7 @@ select.form-input        { cursor: pointer; }
 }
 
 .tab-btn:hover  { color: var(--text); }
-.tab-btn.active { background: var(--accent); color: var(--primary); box-shadow: var(--shadow-sm); }
+.tab-btn.active { background: var(--accent); color: var(--primary); box-shadow: var(--shadow-inset-sm); }
 
 /* ── AI Result Box ─────────────────────────────────────────── */
 .ai-box {
@@ -991,7 +1003,7 @@ select.form-input        { cursor: pointer; }
 }
 
 .filter-tab:hover  { color: var(--text); }
-.filter-tab.active { background: var(--card); color: var(--primary); box-shadow: var(--shadow-sm); }
+.filter-tab.active { background: var(--card); color: var(--primary); box-shadow: var(--shadow-inset-sm); }
 
 /* ── Review Panels ─────────────────────────────────────────── */
 .sub-panel {
@@ -1463,19 +1475,59 @@ select.form-input        { cursor: pointer; }
 }
 
 .login-container {
+  /* Slide mechanic added on top of the original grid layout — on
+     desktop, .login-left and .login-right become absolutely
+     positioned panels that swap sides via a class toggle
+     (.register-orientation, driven by login-motion.js), instead of
+     sitting in fixed grid columns. Mobile keeps the original simple
+     grid collapse (see the 768px media query below), so this only
+     changes behavior above that breakpoint. */
+  position: relative;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 24px;
+  gap: 0;
   max-width: 1000px;
   width: 100%;
   min-height: 600px;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  background: var(--card);
+}
+
+@media (min-width: 769px) {
+  .login-container { display: block; }
+
+  .login-left,
+  .login-right {
+    position: absolute;
+    top: 0;
+    width: 50%;
+    height: 100%;
+  }
+
+  .login-left  { left: 0; transition: left 820ms cubic-bezier(0.4,0,0.2,1); }
+  .login-right { right: 0; }
+
+  .login-container.register-orientation .login-left  { left: 50%; }
+  .login-container.register-orientation .login-right { right: auto; left: 0; }
+
+  /* Form content fades in AFTER the slide finishes (sequenced by
+     login-motion.js listening for .login-left's transitionend) —
+     same pattern as before, just retargeted at .login-right instead
+     of the old .login-box class name. */
+  .login-right.form-fade-pending { opacity: 0; }
+  .login-right.form-fade-in { animation: formFadeIn 300ms ease-out both; }
+}
+
+@keyframes formFadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 .login-left {
-  border-radius: var(--radius-lg);
   background: linear-gradient(180deg, rgba(0,0,0,0.1), rgba(0,0,0,0.4)),
               url('https://images.unsplash.com/photo-1507842217343-583bb7270b66?w=800&q=80') center/cover;
-  position: relative;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -1488,7 +1540,6 @@ select.form-input        { cursor: pointer; }
   position: absolute;
   inset: 0;
   background: linear-gradient(180deg, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.5) 100%);
-  border-radius: var(--radius-lg);
 }
 
 .login-left-content {
@@ -1568,10 +1619,8 @@ select.form-input        { cursor: pointer; }
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: 48px 40px;
+  padding: 40px 36px;
   background: var(--card);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow);
 }
 
 .login-welcome {
@@ -1588,8 +1637,106 @@ select.form-input        { cursor: pointer; }
   font-size: 1.8rem;
   font-weight: 700;
   color: var(--text);
-  line-height: 1.2;
-  margin-bottom: 28px;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  margin-bottom: 18px;
+}
+
+/* ── Mobile: full-bleed welcome screen + Sign In/Sign Up toggle ──
+   Restored from earlier work — his simpler mobile fallback (just
+   hides .login-left, shows .login-right alone) doesn't include
+   these; re-layered on top using the same image/gradient/font
+   tokens as the rest of this login system. */
+.mobile-welcome {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: linear-gradient(180deg, rgba(15,25,45,0.30) 0%, rgba(10,16,30,0.55) 55%, rgba(8,13,24,0.96) 100%),
+              url('https://images.unsplash.com/photo-1507842217343-583bb7270b66?w=800&q=80') center/cover;
+  color: white;
+  padding: 28px 22px;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.mw-top { display: flex; flex-direction: column; align-items: flex-start; }
+.mw-logo {
+  width: 44px; height: 44px;
+  background: var(--accent);
+  color: var(--primary);
+  border-radius: var(--radius-sm);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.3rem;
+  font-weight: 800;
+  margin-bottom: 12px;
+}
+.mw-top h1 { font-family: var(--font-serif); font-size: 1.7rem; margin-bottom: 2px; }
+.mw-sub { font-size: 0.76rem; color: var(--accent); font-weight: 700; letter-spacing: 0.04em; margin-bottom: 18px; }
+
+.mw-tags { display: flex; flex-wrap: wrap; gap: 8px; }
+.mw-tag {
+  background: rgba(0,0,0,0.4);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255,255,255,0.15);
+  color: white;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 5px 12px;
+  border-radius: var(--radius-pill);
+}
+
+.mw-bottom h2 { font-family: var(--font-serif); font-size: 1.55rem; margin-bottom: 10px; }
+.mw-bottom p { font-size: 0.85rem; line-height: 1.6; color: rgba(255,255,255,0.85); margin-bottom: 20px; }
+.mw-footnote { text-align: center; font-size: 0.72rem; color: rgba(255,255,255,0.5); margin-top: 10px; }
+
+/* Sign In / Sign Up toggle pill — mobile only, inside .login-right */
+.auth-toggle {
+  display: none;
+  position: relative;
+  background: var(--bg-alt);
+  border-radius: var(--radius-pill);
+  padding: 4px;
+  margin-bottom: 22px;
+  box-shadow: var(--shadow-inset-sm);
+}
+.auth-toggle-indicator {
+  position: absolute;
+  top: 4px; bottom: 4px; left: 4px;
+  width: calc(50% - 4px);
+  background: var(--accent);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-sm);
+  transition: transform 220ms cubic-bezier(0.4,0,0.2,1);
+}
+.auth-toggle.on-register .auth-toggle-indicator { transform: translateX(100%); }
+.auth-toggle button {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  width: 50%;
+  background: none;
+  border: none;
+  padding: 8px;
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: var(--muted);
+  cursor: pointer;
+}
+.auth-toggle { display: flex; }
+.auth-toggle button.active { color: var(--primary); }
+
+@media (max-width: 768px) {
+  .mobile-welcome { display: flex; }
+  body.welcome-dismissed .mobile-welcome { display: none; }
+  body:not(.welcome-dismissed) .login-container { display: none; }
+}
+@media (min-width: 769px) {
+  .mobile-welcome { display: none !important; }
+  .auth-toggle { display: none !important; }
 }
 
 .login-label {
@@ -1597,26 +1744,29 @@ select.form-input        { cursor: pointer; }
   font-size: 0.76rem;
   font-weight: 600;
   color: var(--text);
-  margin-bottom: 6px;
+  line-height: 1.4;
+  margin-bottom: 4px;
 }
 
 .login-input {
   width: 100%;
-  background: var(--bg);
-  border: 1px solid rgba(0,0,0,0.08);
+  background: var(--field-fill);
+  border: 1px solid rgba(0,0,0,0.06);
   border-radius: var(--radius-sm);
   padding: 12px 14px;
   color: var(--text);
   font-size: 0.92rem;
   font-family: inherit;
-  margin-bottom: 16px;
+  line-height: 1.5;
+  margin-bottom: 12px;
+  box-shadow: var(--shadow-inset-sm);
   transition: border-color 0.18s, box-shadow 0.18s;
 }
-.login-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px rgba(245,197,24,0.2); }
-.login-input::placeholder { color: #b0b7c3; }
+.login-input:focus { outline: none; border-color: var(--accent); box-shadow: var(--shadow-inset-sm), 0 0 0 2px rgba(245,197,24,0.2); }
+.login-input::placeholder { color: #8a7c68; letter-spacing: 0.01em; }
 
 .login-input-option {
-  background-color: var(--bg);
+  background-color: var(--field-fill);
   color: var(--text);
 }
 
@@ -1640,6 +1790,7 @@ select.form-input        { cursor: pointer; }
   padding: 13px;
   font-size: 0.95rem;
   font-weight: 700;
+  letter-spacing: 0.02em;
   cursor: pointer;
   transition: all 0.18s;
   box-shadow: 0 2px 8px rgba(245,197,24,0.25);
@@ -1690,7 +1841,7 @@ select.form-input        { cursor: pointer; }
   background: transparent;
   transition: all 0.18s;
 }
-.role-tab.active { background: var(--card); color: var(--primary); box-shadow: var(--shadow-sm); }
+.role-tab.active { background: var(--card); color: var(--primary); box-shadow: var(--shadow-inset-sm); }
 
 /* ── Scrollbar ─────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 5px; }
@@ -1816,38 +1967,21 @@ select.form-input        { cursor: pointer; }
 .citation-pop { animation: badgePop 150ms ease-out; }
 
 /* ═══════════════════════════════════════════════════════════
-   AMBIENT BACKGROUND
+   AMBIENT BACKGROUND — removed, per an earlier decision to drop it
    ═══════════════════════════════════════════════════════════ */
 
-.page-ambient {
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  overflow: hidden;
-  pointer-events: none;
+/* ═══════════════════════════════════════════════════════════
+   PAGE-ENTRY FADE — whole-page fade+rise, applied by page-fade.js
+   the moment each page's body flips from visibility:hidden to
+   visible. Distinct from .motion-in (per-element, via staggerIn())
+   — this is the outer container's own entrance.
+   ═══════════════════════════════════════════════════════════ */
+body.page-fade-in {
+  animation: pageFadeIn 340ms ease-out both;
 }
-
-.ambient-icon {
-  position: absolute;
-  bottom: -60px;
-  opacity: 0;
-  animation-name: ambientFloat;
-  animation-timing-function: linear;
-  animation-iteration-count: infinite;
-  will-change: transform, opacity;
-}
-
-@keyframes ambientFloat {
-  0% {
-    transform: translate(0, 0) rotate(var(--rot-start, 0deg));
-    opacity: 0;
-  }
-  8%  { opacity: var(--peak-opacity, 0.12); }
-  85% { opacity: var(--peak-opacity, 0.12); }
-  100% {
-    transform: translate(var(--drift-x, 20px), -115vh) rotate(var(--rot-end, 20deg));
-    opacity: 0;
-  }
+@keyframes pageFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 /* ── Login Glow ────────────────────────────────────────────── */

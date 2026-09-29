@@ -14,124 +14,84 @@
 
 <body class="login-bg">
 
-  <div class="page-ambient" id="ambientBg"></div>
+  <div class="mobile-welcome" id="mobileWelcome">
+    <div class="mw-top">
+      <div class="mw-logo">i</div>
+      <h1>iPeek</h1>
+      <p class="mw-sub">RESEARCH DISCOVERY PLATFORM</p>
+      <div class="mw-tags">
+        <span class="mw-tag">AI-Assisted Analysis</span>
+        <span class="mw-tag">Cross-Institutional</span>
+        <span class="mw-tag">Open Access</span>
+      </div>
+    </div>
+    <div class="mw-bottom">
+      <h2>Research Discovery Made Simple</h2>
+      <p>Discover, analyze, and explore research papers with AI-powered insights.</p>
+      <button type="button" class="btn-sign" id="mobileWelcomeSignIn">Sign In →</button>
+      <p class="mw-footnote">ISAT-U institutional credentials only</p>
+    </div>
+  </div>
 
+  <div class="login-container" id="authShell">
 
-  <!-- ============================================================
-       SPLIT SCREEN CONTAINER
-  ============================================================= -->
-  <div class="login-container">
-
-    <!-- ============================================================
-         LEFT PANEL — Hero Image
-    ============================================================= -->
-    <div class="login-left">
+    <div class="login-left" id="imagePanel">
       <div class="login-left-overlay"></div>
-
       <div class="login-left-content">
-
         <div class="login-left-brand">
           <div class="nav-logo">i</div>
           <span>iPeek</span>
         </div>
-
         <div>
           <div class="login-features">
             <div class="login-feature-pill">AI-Assisted Analysis</div>
             <div class="login-feature-pill">Cross-Institutional</div>
             <div class="login-feature-pill">Open Access</div>
           </div>
-
           <h2 class="login-left-headline">Research Discovery<br>Made Simple</h2>
-
           <p class="login-left-sub">
             Discover, analyze, and explore research papers with AI-powered insights.
           </p>
-
           <div class="login-dots">
             <div class="login-dot active"></div>
             <div class="login-dot"></div>
             <div class="login-dot"></div>
           </div>
         </div>
-
       </div>
     </div>
 
-
-    <!-- ============================================================
-         RIGHT PANEL — Forms
-    ============================================================= -->
     <div class="login-right">
 
-      <!-- ============================================================
-           SIGN IN PANEL
-      ============================================================= -->
-      <div id="loginPanel">
+      <div class="auth-toggle" id="authToggle">
+        <div class="auth-toggle-indicator"></div>
+        <button type="button" id="toggleSignIn" class="active">Sign In</button>
+        <button type="button" id="toggleSignUp">Sign Up</button>
+      </div>
 
+      <div id="loginPanel">
         <div class="login-welcome">Welcome back</div>
         <h1 class="login-heading">Sign In</h1>
-
         <div class="err-box" id="loginErr"></div>
-
         <label class="login-label">Institutional Email</label>
-        <input
-          class="login-input"
-          id="loginUid"
-          type="email"
-          placeholder="you@students.isatu.edu.ph"
-        >
-
+        <input class="login-input" id="loginUid" type="email" placeholder="you@students.isatu.edu.ph">
         <label class="login-label">Password</label>
-        <input
-          class="login-input"
-          id="loginPwd"
-          type="password"
-          placeholder="Enter your password"
-        >
-
-        <button
-          type="button"
-          class="btn-sign"
-          id="loginBtn"
-        >
-          Sign In to Repository
-        </button>
-
+        <input class="login-input" id="loginPwd" type="password" placeholder="Enter your password">
+        <button type="button" class="btn-sign" id="loginBtn">Sign In to Repository</button>
         <div class="login-foot">
           Don't have an account?
           <a href="#" id="showRegisterLink">Create one</a>
         </div>
-
       </div>
 
-
-      <!-- ============================================================
-           REGISTER PANEL — STEP 1: ACCOUNT DETAILS
-      ============================================================= -->
       <div id="registerPanel" style="display:none;">
-
         <div class="login-welcome">Create account</div>
         <h1 class="login-heading">Register</h1>
-
         <div class="err-box" id="regErr"></div>
-
         <label class="login-label">Full Name</label>
-        <input
-          class="login-input"
-          id="regFullname"
-          type="text"
-          placeholder="Juan Dela Cruz"
-        >
-
+        <input class="login-input" id="regFullname" type="text" placeholder="Juan Dela Cruz">
         <label class="login-label">Institutional Email</label>
-        <input
-          class="login-input"
-          id="regEmail"
-          type="email"
-          placeholder="you@students.isatu.edu.ph or you@isatu.edu.ph"
-        >
-
+        <input class="login-input" id="regEmail" type="email" placeholder="you@students.isatu.edu.ph or you@isatu.edu.ph">
         <label class="login-label">Department / College</label>
         <select class="login-input" id="regDept">
           <option value="">— Select your college —</option>
@@ -141,169 +101,72 @@
           <option>College of Industrial Technology</option>
           <option>College of Education</option>
         </select>
-
-        <label class="login-label">Password</label>
-        <input
-          class="login-input"
-          id="regPwd"
-          type="password"
-          placeholder="Min. 8 characters"
-        >
-
-        <label class="login-label">Confirm Password</label>
-        <input
-          class="login-input"
-          id="regPwd2"
-          type="password"
-          placeholder="Repeat password"
-        >
-
-        <button
-          type="button"
-          class="btn-sign"
-          id="sendCodeBtn"
-        >
-          Send Verification Code
-        </button>
-
+        <div class="form-row">
+          <div>
+            <label class="login-label">Password</label>
+            <input class="login-input" id="regPwd" type="password" placeholder="Min. 8 characters">
+          </div>
+          <div>
+            <label class="login-label">Confirm Password</label>
+            <input class="login-input" id="regPwd2" type="password" placeholder="Repeat password">
+          </div>
+        </div>
+        <button type="button" class="btn-sign" id="sendCodeBtn">Send Verification Code</button>
         <div class="login-foot">
           Already have an account?
           <a href="#" id="showLoginLink">Sign in</a>
         </div>
-
       </div>
 
-
-      <!-- ============================================================
-           OTP PANEL — STEP 2: VERIFY EMAIL
-      ============================================================= -->
       <div id="otpPanel" style="display:none;">
-
         <div class="login-welcome">Verify email</div>
         <h1 class="login-heading">Enter Code</h1>
-
         <div class="err-box" id="otpErr"></div>
-
         <p style="font-size:0.84rem; color:var(--muted, #666); margin-bottom:14px;">
-          We sent a 6-digit code to
-          <strong id="otpEmailDisplay"></strong>.
-          Enter it below.
+          We sent a 6-digit code to <strong id="otpEmailDisplay"></strong>. Enter it below.
         </p>
-
         <label class="login-label">Verification Code</label>
-        <input
-          class="login-input"
-          id="otpCode"
-          type="text"
-          maxlength="6"
-          inputmode="numeric"
-          autocomplete="one-time-code"
-          placeholder="123456"
-        >
-
-        <button
-          type="button"
-          class="btn-sign"
-          id="verifyBtn"
-        >
-          Verify &amp; Create Account
-        </button>
-
+        <input class="login-input" id="otpCode" type="text" maxlength="6" inputmode="numeric" autocomplete="one-time-code" placeholder="123456">
+        <button type="button" class="btn-sign" id="verifyBtn">Verify &amp; Create Account</button>
         <div class="login-foot">
           <a href="#" id="resendCodeLink">Resend code</a>
           &nbsp;·&nbsp;
           <a href="#" id="editDetailsLink">Edit details</a>
         </div>
-
       </div>
 
     </div>
-
   </div>
 
-
-  <!-- ============================================================
-       TOAST NOTIFICATIONS
-  ============================================================= -->
   <div class="toast-wrap" id="toasts"></div>
 
-
-  <!-- ============================================================
-       JAVASCRIPT
-  ============================================================= -->
+  <script src="js/page-fade.js"></script>
   <script src="js/api.js"></script>
   <script src="js/login.js"></script>
+  <script src="js/login-motion.js"></script>
 
   <script>
     document.addEventListener("DOMContentLoaded", () => {
-
       const loginBtn = document.getElementById("loginBtn");
-      if (loginBtn) {
-        loginBtn.addEventListener("click", (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          login();
-        });
-      }
+      if (loginBtn) loginBtn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); login(); });
 
       const showRegisterLink = document.getElementById("showRegisterLink");
-      if (showRegisterLink) {
-        showRegisterLink.addEventListener("click", (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          showRegister();
-        });
-      }
+      if (showRegisterLink) showRegisterLink.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); showRegister(); });
 
       const showLoginLink = document.getElementById("showLoginLink");
-      if (showLoginLink) {
-        showLoginLink.addEventListener("click", (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          showLogin();
-        });
-      }
+      if (showLoginLink) showLoginLink.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); showLogin(); });
 
       const sendCodeBtn = document.getElementById("sendCodeBtn");
-      if (sendCodeBtn) {
-        sendCodeBtn.addEventListener("click", (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          sendOtp();
-        });
-      }
+      if (sendCodeBtn) sendCodeBtn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); sendOtp(); });
 
       const verifyBtn = document.getElementById("verifyBtn");
-      if (verifyBtn) {
-        verifyBtn.addEventListener("click", (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          verifyAndRegister();
-        });
-      }
+      if (verifyBtn) verifyBtn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); verifyAndRegister(); });
 
       const resendCodeLink = document.getElementById("resendCodeLink");
-      if (resendCodeLink) {
-        resendCodeLink.addEventListener("click", (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          sendOtp();
-        });
-      }
+      if (resendCodeLink) resendCodeLink.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); sendOtp(); });
 
       const editDetailsLink = document.getElementById("editDetailsLink");
-      if (editDetailsLink) {
-        editDetailsLink.addEventListener("click", (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          showRegister();
-        });
-      }
-
-      if (typeof initAmbientBackground === "function") {
-        initAmbientBackground(document.getElementById("ambientBg"), 500);
-      }
-
+      if (editDetailsLink) editDetailsLink.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); showRegister(); });
     });
   </script>
 

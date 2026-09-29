@@ -122,4 +122,6 @@ function renderList(submissions) {
 
     list.appendChild(card);
   });
+
+  staggerIn(list); // subtle staggered fade-in, from motion.js
 }

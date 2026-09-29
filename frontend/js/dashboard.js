@@ -100,6 +100,8 @@ function renderRecentList(submissions) {
     row.appendChild(right);
     list.appendChild(row);
   });
+
+  staggerIn(list); // subtle staggered fade-in, from motion.js
 }
 
 async function confirmDeletePaper(id, title) {
