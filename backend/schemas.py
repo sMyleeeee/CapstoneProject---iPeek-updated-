@@ -39,9 +39,25 @@ class UserOut(BaseModel):
     role: RoleEnum
     department: Optional[str] = None
     contact: Optional[str] = None
+    is_active: bool = True
 
     class Config:
         from_attributes = True
+
+
+class AdminUserCreate(_EmailNormalizedBase):
+    """Librarian-created account. NO password field (generated server-side)
+    and NO role field — role is derived from the email domain, same as the
+    OTP self-registration flow."""
+    fullname: str
+    department: Optional[str] = None
+
+
+class AdminUserOut(BaseModel):
+    """Returned ONCE at creation: the plaintext generated password is only
+    in this response — never logged, never emailed, never retrievable again."""
+    user: UserOut
+    generated_password: str
 
 
 class UserUpdate(BaseModel):

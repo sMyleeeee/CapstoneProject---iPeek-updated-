@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import MAX_UPLOAD_SIZE, PUBLIC_DIR, STAGING_DIR
 from database import get_db
-from dependencies import require_role
+from dependencies import get_current_sid, is_kiosk_session, require_role
 from models import Feedback, Research, StatusEnum, User
 from schemas import FeedbackOut, ResearchOut, UploadConfirmIn, UploadPreviewOut
 from services.ingestor import ingestor
@@ -40,6 +40,7 @@ async def get_preview_pdf(
 async def get_pdf(
     source_stem: str,
     current_user: User = Depends(require_role("student", "faculty", "librarian")),
+    sid: str | None = Depends(get_current_sid),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(select(Research).where(Research.source_stem == source_stem))
@@ -51,13 +52,17 @@ async def get_pdf(
     is_librarian = current_user.role.value == "librarian"
     is_approved = research.status == StatusEnum.approved
 
-    # Approved research is public to any logged-in user. Anything else
-    # (pending/returned) is only viewable by whoever uploaded it or by
-    # a librarian - which is specifically what makes review possible:
-    # a librarian could never previously open a pending submission's
-    # PDF to check it before approving.
-    if not (is_approved or is_owner or is_librarian):
-        raise HTTPException(status_code=403, detail="You do not have permission to view this document.")
+    # Privacy rule: full PDFs of APPROVED research are only served to
+    #  - Library Viewing Station sessions (kiosk-activated sid),
+    #  - librarians (review workflow needs every status),
+    #  - the uploader (their own paper, any status — My Submissions page).
+    # Remote viewers of other people's approved papers get an IMRaD
+    # summary on the detail page instead (POST /ai/{id}/imrad).
+    if not (is_owner or is_librarian or (is_approved and await is_kiosk_session(sid, db))):
+        raise HTTPException(
+            status_code=403,
+            detail="Full document viewing is only available at the Library Viewing Station.",
+        )
 
     if is_approved:
         path = PUBLIC_DIR / f"{source_stem}.pdf"

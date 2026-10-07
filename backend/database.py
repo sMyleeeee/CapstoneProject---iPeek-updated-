@@ -29,6 +29,27 @@ async def get_db():
 
 
 async def init_db():
-    """Create tables on startup if they don't exist yet."""
+    """Create tables on startup if they don't exist yet, then apply any
+    lightweight column migrations (create_all never alters existing tables)."""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        await _migrate_columns(conn)
+
+
+async def _migrate_columns(conn):
+    """SQLite-safe ALTER TABLE for columns added after a table already exists."""
+    from sqlalchemy import text
+
+    rows = await conn.execute(text("PRAGMA table_info(users)"))
+    existing = {row[1] for row in rows}
+    if "is_active" not in existing:
+        await conn.execute(text(
+            "ALTER TABLE users ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT 1"
+        ))
+
+    rows = await conn.execute(text("PRAGMA table_info(ai_analysis)"))
+    existing = {row[1] for row in rows}
+    if "imrad" not in existing:
+        await conn.execute(text(
+            "ALTER TABLE ai_analysis ADD COLUMN imrad TEXT"
+        ))

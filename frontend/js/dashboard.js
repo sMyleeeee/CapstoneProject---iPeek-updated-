@@ -28,9 +28,86 @@ async function initPage() {
   }
 
   loadRepositoryStatus();
+  loadKioskSessions();
 }
 
 initPage();
+
+/* ── Library Terminal sessions (session-scoped kiosk lock) ───────────────── */
+
+async function loadKioskSessions() {
+  const list = document.getElementById("kioskSessionList");
+  if (!list) return;
+  list.innerHTML = "";
+
+  let sessions = [];
+  try {
+    const data = await apiKioskSessions();
+    sessions = data.sessions || [];
+  } catch {
+    const err = document.createElement("p");
+    err.className   = "text-muted";
+    err.textContent = "Could not load terminal sessions.";
+    list.appendChild(err);
+    return;
+  }
+
+  if (sessions.length === 0) {
+    const empty = document.createElement("p");
+    empty.className   = "text-muted";
+    empty.textContent = "No Library Viewing Station sessions are active.";
+    list.appendChild(empty);
+    return;
+  }
+
+  sessions.forEach(s => {
+    const row = document.createElement("div");
+    row.className = "recent-item";
+
+    const left = document.createElement("div");
+
+    const title = document.createElement("div");
+    title.className   = "recent-item-title";
+    title.textContent = s.user;
+
+    const meta = document.createElement("div");
+    meta.className   = "recent-item-meta";
+    meta.textContent = `${s.role} · ${s.updated_at ? s.updated_at.slice(0, 16).replace("T", " ") : ""}`;
+
+    left.appendChild(title);
+    left.appendChild(meta);
+
+    const right = document.createElement("div");
+    right.style.cssText = "display:flex;align-items:center;gap:8px;";
+
+    const badge = document.createElement("span");
+    badge.className = s.locked ? "badge badge-rejected" : "badge badge-validated";
+    badge.textContent = s.locked ? "locked" : "open";
+    right.appendChild(badge);
+
+    const btn = document.createElement("button");
+    btn.className = "btn btn-ghost btn-sm";
+    btn.textContent = s.locked ? "Unlock" : "Lock";
+    btn.addEventListener("click", async () => {
+      btn.disabled = true;
+      try {
+        await apiKioskSetLockFor(s.sid, !s.locked);
+        toast(s.locked ? "Terminal session unlocked." : "Terminal session locked.", "success");
+        await loadKioskSessions();
+      } catch (e) {
+        toast(`Lock failed: ${e.message}`, "error");
+        btn.disabled = false;
+      }
+    });
+    right.appendChild(btn);
+
+    row.appendChild(left);
+    row.appendChild(right);
+    list.appendChild(row);
+  });
+
+  staggerIn(list);
+}
 
 function renderStats(submissions) {
   const total     = submissions.length;

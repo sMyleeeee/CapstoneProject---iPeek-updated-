@@ -1,3 +1,5 @@
+from uuid import uuid4
+
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from slowapi import Limiter
@@ -54,7 +56,18 @@ async def login(
             detail="Incorrect username or password",
         )
 
-    access_token = create_access_token(data={"sub": str(user.id), "role": user.role.value})
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This account has been deactivated. Contact the librarian.",
+        )
+
+    # "sid" = per-login session id. Every login (device/browser) gets a
+    # fresh UUID, so the kiosk lock can be scoped to ONE session and can
+    # never leak into another session of the same user/role.
+    access_token = create_access_token(
+        data={"sub": str(user.id), "role": user.role.value, "sid": uuid4().hex}
+    )
     return Token(access_token=access_token, role=user.role, fullname=user.fullname)
 
 

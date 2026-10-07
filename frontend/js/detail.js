@@ -1,8 +1,10 @@
 /**
  * detail.js
  * ---------
- * Research Detail page: loads one paper, runs AI similarity/summary/gaps
- * analysis, and drives the PDF viewer + chat panel.
+ * Research Detail page: loads one paper, runs AI similarity/summary/gaps/
+ * IMRaD analysis. Full-PDF viewing was removed from this page (remote
+ * privacy) — the PDF viewer logic now lives in library.js (Library
+ * Viewing Station); this page shows the IMRaD summary instead.
  *
  * FIX NOTES (added — these were missing and caused the page to show
  * only the static shell with every panel stuck on "Loading..."):
@@ -10,11 +12,9 @@
  *     ReferenceError on the very first line of initPage(), which
  *     silently killed everything after it.
  *   - renderPaperInfo, showError, switchTab, renderSimilarityBars,
- *     renderSimilarProjects, renderGapsList, sendChat, chatKey, and
- *     the PDF viewer helpers (renderPdfPage, updatePageInfo,
- *     pdfPrevPage, pdfNextPage, hidePdfViewer) were called by this
- *     file and by detail.html's onclick handlers, but never defined.
- *   - pdfDoc / pdfPage / pdfVisible were used but never declared.
+ *     renderSimilarProjects, renderGapsList, sendChat, chatKey were
+ *     called by this file and by detail.html's onclick handlers, but
+ *     never defined.
  *
  * All DOM writes use textContent/createElement, never innerHTML with
  * data values — matches the XSS-safe pattern used across the rest of
@@ -27,11 +27,6 @@ const docId = new URLSearchParams(window.location.search).get("id");
 /* ── State ───────────────────────────────────────────────────────────────── */
 let paperData    = null;
 let researchId    = null;
-
-/* PDF viewer state */
-let pdfDoc     = null;
-let pdfPage    = 1;
-let pdfVisible = false;
 
 async function initPage() {
   const navPromise = (async () => {
@@ -66,7 +61,7 @@ async function initPage() {
 
   await navPromise;
 
-  ["simBars", "summaryBox", "gapsBox"].forEach(id => {
+  ["simBars", "summaryBox", "gapsBox", "imradBox"].forEach(id => {
     const el = document.getElementById(id);
     if (el && typeof bookLoaderHTML === "function") {
       el.innerHTML = `<div style="display:flex;justify-content:center;padding:30px 0;">${bookLoaderHTML(48)}</div>`;
@@ -77,6 +72,7 @@ async function initPage() {
     runSimilarity(),
     runSummary(),
     runGaps(),
+    runImrad(),
   ]);
 
   /* Render citation badges from similarity sources */
@@ -142,7 +138,7 @@ function showError(msg) {
   const abstractEl = document.getElementById("abstractText");
   if (abstractEl) abstractEl.textContent = msg;
 
-  ["simBars", "summaryBox", "gapsBox"].forEach(id => {
+  ["simBars", "summaryBox", "gapsBox", "imradBox"].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.textContent = "";
   });
@@ -162,6 +158,7 @@ const TAB_PANELS = {
   similarity: "tabSimilarity",
   summary:    "tabSummary",
   gaps:       "tabGaps",
+  imrad:      "tabImrad",
 };
 
 /**
@@ -171,6 +168,7 @@ function getActiveTab() {
   const active = document.querySelector(".tab-btn.active");
   if (!active) return "similarity";
   const text = active.textContent.toLowerCase();
+  if (text.includes("imrad"))      return "imrad";
   if (text.includes("similarity")) return "similarity";
   if (text.includes("summary"))    return "summary";
   if (text.includes("gap"))        return "gaps";
@@ -179,7 +177,7 @@ function getActiveTab() {
 
 /**
  * Switches the active AI-analysis tab.
- * @param {string} tab - one of "similarity" | "summary" | "gaps"
+ * @param {string} tab - one of "similarity" | "summary" | "gaps" | "imrad"
  * @param {HTMLElement} el - the tab button that was clicked
  */
 function switchTab(tab, el) {
@@ -240,6 +238,8 @@ async function refineAnalysis() {
       if (box) box.textContent = data.result.replace(/\*\*/g, "");
     } else if (target === "gap") {
       renderGapsList(data.result);
+    } else if (target === "imrad") {
+      renderImrad(data.result);
     }
 
     /* Switch to the refined tab if not already active */
@@ -317,6 +317,22 @@ async function runGaps() {
       const msg = document.createElement("span");
       msg.className   = "tab-error";
       msg.textContent = `⚠️ Gap analysis failed: ${e.message}`;
+      box.appendChild(msg);
+    }
+  }
+}
+
+async function runImrad() {
+  const box = document.getElementById("imradBox");
+  try {
+    const data = await apiImrad(researchId);
+    renderImrad(data.result);
+  } catch (e) {
+    if (box) {
+      box.textContent = "";
+      const msg = document.createElement("span");
+      msg.className   = "tab-error";
+      msg.textContent = `⚠️ IMRaD summary failed: ${e.message}`;
       box.appendChild(msg);
     }
   }
@@ -512,132 +528,72 @@ function renderGapsList(text) {
   });
 }
 
-/* ── PDF viewer ──────────────────────────────────────────────────────────── */
+/* ── IMRaD rendering ─────────────────────────────────────────────────────── */
 
-async function revealPdfViewer() {
-  const isMobile = window.innerWidth <= 768;
+const IMRAD_SECTIONS = ["Introduction", "Methods", "Results", "Discussion"];
 
-  if (isMobile) {
-    /* Mobile: open full-screen PDF overlay */
-    const overlay = document.getElementById("pdfOverlay");
-    if (overlay) overlay.classList.add("open");
-  } else {
-    /* Desktop: show inline PDF viewer card */
-    const card    = document.getElementById("pdfViewerCard");
-    const trigger = document.getElementById("pdfViewerTrigger");
-    if (!card) return;
-    card.style.display    = "block";
-    if (trigger) trigger.style.display = "none";
-  }
+/**
+ * Parses the LLM's IMRaD output into four labeled sections. The prompt
+ * (rag.py IMRAD_PROMPT) mandates exact "**Section:**" headers; if the
+ * model deviates and not all four headers are found, falls back to the
+ * raw text — same never-blank fallback as renderGapsList/renderSimilarityBars.
+ * @param {string} text - raw LLM output from apiImrad().result
+ */
+function renderImrad(text) {
+  const container = document.getElementById("imradBox");
+  if (!container) return;
+  container.innerHTML = "";
 
-  pdfVisible = true;
-
-  if (pdfDoc) {
-    renderPdfPage(pdfPage);
+  if (!text || !text.trim()) {
+    const empty = document.createElement("div");
+    empty.className   = "tab-error";
+    empty.textContent = "No IMRaD summary available.";
+    container.appendChild(empty);
     return;
   }
 
-  const errorEl = document.getElementById("pdfError");
-  const canvas  = document.getElementById("pdfCanvas");
-  if (errorEl) errorEl.style.display = "none";
-  if (canvas)  canvas.style.display  = "block";
-
-  try {
-    const url = apiPdfUrl(docId);
-
-    if (typeof pdfjsLib === "undefined") {
-      throw new Error("PDF.js not loaded. Check the CDN script tag in detail.html.");
+  /* Locate each section header (bold-with-colon variants, then plain line-start) */
+  const headers = IMRAD_SECTIONS.map(label => {
+    const variants = [`**${label}:**`, `**${label}**:`];
+    for (const v of variants) {
+      const idx = text.indexOf(v);
+      if (idx !== -1) return { label, start: idx, contentStart: idx + v.length };
     }
+    const re = new RegExp(`(?:^|\\n)[ \\t]*${label}[ \\t]*:`, "i");
+    const m = re.exec(text);
+    if (m) return { label, start: m.index, contentStart: m.index + m[0].length };
+    return null;
+  });
 
-    pdfjsLib.GlobalWorkerOptions.workerSrc =
-      "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
-
-    // httpHeaders carries the JWT bearer token — replaces the old
-    // withCredentials:true cookie-based approach
-    pdfDoc = await pdfjsLib.getDocument({ url, httpHeaders: apiAuthHeaderForPdf() }).promise;
-    updatePageInfo();
-    await renderPdfPage(1);
-
-  } catch (e) {
-    if (canvas)  canvas.style.display  = "none";
-    if (errorEl) {
-      errorEl.style.display = "block";
-      errorEl.textContent   = `Could not load PDF: ${e.message}`;
-    }
-    toast("PDF failed to load. The document may not be approved yet.", "error");
-  }
-}
-
-/**
- * Renders a single page of the loaded PDF onto the canvas.
- * @param {number} num - 1-indexed page number
- */
-async function renderPdfPage(num) {
-  if (!pdfDoc) return;
-  pdfPage = num;
-
-  const isMobile = window.innerWidth <= 768;
-  const canvasId = isMobile ? "pdfCanvasOverlay" : "pdfCanvas";
-  const canvas = document.getElementById(canvasId);
-  if (!canvas) return;
-
-  try {
-    const page     = await pdfDoc.getPage(num);
-    const viewport = page.getViewport({ scale: 1.4 });
-    canvas.width  = viewport.width;
-    canvas.height = viewport.height;
-
-    const ctx = canvas.getContext("2d");
-    await page.render({ canvasContext: ctx, viewport }).promise;
-  } catch (e) {
-    toast(`Could not render page ${num}: ${e.message}`, "error");
+  if (headers.some(h => h === null)) {
+    // LLM didn't follow the expected format — show raw text instead
+    const pre = document.createElement("div");
+    pre.style.cssText = "white-space:pre-wrap;font-size:0.84rem;line-height:1.6;";
+    pre.textContent = text.replace(/\*\*/g, "");
+    container.appendChild(pre);
+    return;
   }
 
-  updatePageInfo();
-}
+  headers.forEach((header, i) => {
+    const bodyStart = header.contentStart;
+    const bodyEnd   = i + 1 < headers.length ? headers[i + 1].start : text.length;
+    const body      = text.slice(bodyStart, bodyEnd).replace(/\*\*/g, "").trim();
 
-function updatePageInfo() {
-  const isMobile = window.innerWidth <= 768;
-  const infoId   = isMobile ? "pdfPageInfoOv" : "pdfPageInfo";
-  const prevId   = isMobile ? "pdfPrevBtnOv"  : "pdfPrevBtn";
-  const nextId   = isMobile ? "pdfNextBtnOv"  : "pdfNextBtn";
+    const section = document.createElement("div");
+    section.style.cssText = "margin-bottom:14px;";
 
-  const info    = document.getElementById(infoId);
-  const prevBtn = document.getElementById(prevId);
-  const nextBtn = document.getElementById(nextId);
+    const h = document.createElement("div");
+    h.style.cssText = "font-weight:700;font-size:0.88rem;margin-bottom:4px;";
+    h.textContent = header.label;
 
-  if (info) {
-    info.textContent = pdfDoc ? `Page ${pdfPage} / ${pdfDoc.numPages}` : "Page — / —";
-  }
-  if (prevBtn) prevBtn.disabled = pdfPage <= 1;
-  if (nextBtn) nextBtn.disabled = !pdfDoc || pdfPage >= pdfDoc.numPages;
-}
+    const p = document.createElement("div");
+    p.style.cssText = "font-size:0.84rem;line-height:1.65;";
+    p.textContent = body || "—";
 
-function pdfPrevPage() {
-  if (pdfPage > 1) renderPdfPage(pdfPage - 1);
-}
-
-function pdfNextPage() {
-  if (pdfDoc && pdfPage < pdfDoc.numPages) renderPdfPage(pdfPage + 1);
-}
-
-function closePdfOverlay() {
-  const overlay = document.getElementById("pdfOverlay");
-  if (overlay) overlay.classList.remove("open");
-}
-
-function hidePdfViewer() {
-  const isMobile = window.innerWidth <= 768;
-
-  if (isMobile) {
-    closePdfOverlay();
-  } else {
-    const card    = document.getElementById("pdfViewerCard");
-    const trigger = document.getElementById("pdfViewerTrigger");
-    if (card) card.style.display = "none";
-    if (trigger) trigger.style.display = "block";
-  }
-  pdfVisible = false;
+    section.appendChild(h);
+    section.appendChild(p);
+    container.appendChild(section);
+  });
 }
 
 /* ── Initialize ──────────────────────────────────────────────────────────── */
