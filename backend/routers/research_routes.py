@@ -1,19 +1,45 @@
 from typing import List, Optional
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+import asyncio
+
+import httpx
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, Response
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from config import MAX_UPLOAD_SIZE, PUBLIC_DIR, STAGING_DIR
+from config import MAX_UPLOAD_SIZE, STAGING_DIR
 from database import get_db
-from dependencies import require_role
+from dependencies import get_current_sid, is_kiosk_session, require_role
 from models import Feedback, Research, StatusEnum, User
 from schemas import FeedbackOut, ResearchOut, UploadConfirmIn, UploadPreviewOut
 from services.ingestor import ingestor
+from services.storage import storage_service
 from fastapi.responses import FileResponse
 
 router = APIRouter(prefix="/repository", tags=["Repository"])
+
+
+async def _stream_private_pdf(object_key: str) -> Response:
+    """Generate a short-lived signed URL for a PRIVATE bucket object and
+    proxy its bytes through this authenticated endpoint.
+
+    The signed URL is server-side only: the client keeps hitting our
+    same-origin /repository/... routes with its JWT, so nothing about the
+    consent/ownership gating changes and the URL itself is never exposed.
+    """
+    signed_url = await asyncio.to_thread(
+        storage_service.create_signed_url, object_key
+    )
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        resp = await client.get(signed_url)
+    if resp.status_code != 200:
+        raise HTTPException(status_code=404, detail="Document not available for viewing.")
+    return Response(
+        content=resp.content,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="{Path(object_key).name}"'},
+    )
 
 
 @router.get("/upload/preview/{preview_id}/pdf")
@@ -40,6 +66,7 @@ async def get_preview_pdf(
 async def get_pdf(
     source_stem: str,
     current_user: User = Depends(require_role("student", "faculty", "librarian")),
+    sid: str | None = Depends(get_current_sid),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(select(Research).where(Research.source_stem == source_stem))
@@ -51,25 +78,28 @@ async def get_pdf(
     is_librarian = current_user.role.value == "librarian"
     is_approved = research.status == StatusEnum.approved
 
-    # Approved research is public to any logged-in user. Anything else
-    # (pending/returned) is only viewable by whoever uploaded it or by
-    # a librarian - which is specifically what makes review possible:
-    # a librarian could never previously open a pending submission's
-    # PDF to check it before approving.
-    if not (is_approved or is_owner or is_librarian):
-        raise HTTPException(status_code=403, detail="You do not have permission to view this document.")
+    # Privacy rule: full PDFs of APPROVED research are only served to
+    #  - Library Viewing Station sessions (kiosk-activated sid),
+    #  - librarians (review workflow needs every status),
+    #  - the uploader (their own paper, any status — My Submissions page),
+    #  - remote viewers, but ONLY if the author gave submission-time
+    #    consent (public_pdf_consent == True).
+    # Remote viewers without consent get the IMRaD summary on the detail
+    # page instead (POST /ai/{id}/imrad). The kiosk path is unaffected by
+    # consent — in-person supervised viewing always sees the full PDF.
+    remote_ok = is_approved and (
+        research.public_pdf_consent or await is_kiosk_session(sid, db)
+    )
+    if not (is_owner or is_librarian or remote_ok):
+        raise HTTPException(
+            status_code=403,
+            detail="Full document viewing is only available at the Library Viewing Station.",
+        )
 
-    if is_approved:
-        path = PUBLIC_DIR / f"{source_stem}.pdf"
-    else:
-        # Approval only COPIES the file to PUBLIC_DIR; the original
-        # always still exists at research.filepath (PENDING_DIR),
-        # regardless of status, so this works for pending and returned.
-        path = Path(research.filepath)
-
-    if not path.exists():
-        raise HTTPException(status_code=404, detail="Document not available for viewing.")
-    return FileResponse(str(path), media_type="application/pdf")
+    # filepath is authoritative: pending/{stem}.pdf for non-approved,
+    # public/{stem}.pdf for approved (approval MOVES the object and updates
+    # filepath in the same operation).
+    return await _stream_private_pdf(research.filepath)
 
 @router.post("/upload/preview", response_model=UploadPreviewOut)
 async def upload_preview(
@@ -98,7 +128,10 @@ async def upload_confirm(
     db: AsyncSession = Depends(get_db),
 ):
     try:
-        return await ingestor.confirm_upload(payload.preview_id, payload.final_values, current_user.id, db)
+        return await ingestor.confirm_upload(
+            payload.preview_id, payload.final_values, payload.public_pdf_consent,
+            current_user.id, db,
+        )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

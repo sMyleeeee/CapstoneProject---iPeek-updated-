@@ -15,7 +15,6 @@ so nothing blocks the event loop.
 import json
 import logging
 import re
-import shutil
 import uuid
 from difflib import SequenceMatcher
 from pathlib import Path
@@ -32,11 +31,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import (
     GROQ_API_KEY, LLM_MODEL, CHUNK_SIZE, CHUNK_OVERLAP,
-    ALLOWED_EXTENSIONS, STAGING_DIR, PENDING_DIR, VERSIONS_DIR,
+    ALLOWED_EXTENSIONS, STAGING_DIR,
     DISCREPANCY_THRESHOLD, PREVIEW_MAX_AGE_SECONDS,
 )
 from models import Research, ResearchVersion, StatusEnum
 from services.vectorstore import vectorstore_service
+from services.storage import storage_service
 
 logger = logging.getLogger(__name__)
 
@@ -57,15 +57,21 @@ class Ingestor:
         match = re.search(r'\b(20\d{2})\b', str(raw))
         return int(match.group(1)) if match else None
 
-    def _extract_pages(self, path: str) -> list[dict]:
+    def _extract_pages(self, source) -> list[dict]:
+        """source: local file path (str) or raw PDF bytes (staged/Storage)."""
         try:
-            doc = fitz.open(path)
+            if isinstance(source, (bytes, bytearray)):
+                doc = fitz.open(stream=source, filetype="pdf")
+                label = "uploaded bytes"
+            else:
+                doc = fitz.open(source)
+                label = Path(source).name
             pages = []
             for i, page in enumerate(doc, start=1):
                 text = page.get_text()
                 if text.strip():
                     pages.append({"page": i, "text": text})
-            logger.info(f"Extracted {len(pages)} pages from {Path(path).name}")
+            logger.info(f"Extracted {len(pages)} pages from {label}")
             return pages
         except Exception as e:
             logger.error(f"Page extraction failed: {e}")
@@ -200,10 +206,42 @@ Document (first 3000 characters):
             "resubmission": is_resubmission, "ai_metadata": ai_meta, "source": stem, "filename": filename,
         }
 
+    # ── Embedding helpers (shared with reindex_chroma.py) ───────────
+
+    def build_documents(self, pages: list[dict], meta: dict, stem: str) -> list:
+        """Chunk extracted pages into LangChain Documents with the exact
+        metadata schema used for normal ingestion."""
+        documents = []
+        for p in pages:
+            for chunk in self._splitter.split_text(p["text"]):
+                documents.append(Document(
+                    page_content=chunk,
+                    metadata={
+                        "title": meta.get("title", stem), "authors": meta.get("authors", "Unknown"),
+                        "year": str(meta.get("year_normalized") or "Unknown"),
+                        "college": meta.get("college", "Unknown"),
+                        "keywords": meta.get("keywords", "Unknown"),
+                        "abstract": meta.get("abstract", ""), "source": stem, "page": p["page"],
+                    }
+                ))
+        return documents
+
+    async def index_documents(self, stem: str, documents: list) -> bool:
+        """Replace this paper's chunks in ChromaDB (delete-then-add keeps
+        re-runs idempotent — no duplicate entries for the same source)."""
+        try:
+            await vectorstore_service.delete_by_source(stem)
+            await vectorstore_service.add_documents(documents)
+            return True
+        except Exception:
+            logger.exception(f"Vector indexing failed for '{stem}'")
+            return False
+
     # ── CONFIRM ──────────────────────────────────────────────────────
 
     async def confirm_upload(
-        self, preview_id: str, final_values: dict, student_id: int, db: AsyncSession
+        self, preview_id: str, final_values: dict, public_pdf_consent: bool,
+        student_id: int, db: AsyncSession
     ) -> dict:
         import asyncio
 
@@ -227,26 +265,31 @@ Document (first 3000 characters):
             staged_path.unlink(missing_ok=True)
             raise ValueError(f"A paper named '{filename}' was submitted by someone else in the meantime.")
 
-        pending_path = PENDING_DIR / f"{stem}.pdf"
+        # Committed PDFs live in the private Supabase Storage bucket:
+        # pending/{stem}.pdf is the canonical copy (Research.filepath holds
+        # this object key). Staged previews stay ephemeral on local disk.
+        pending_key = storage_service.pending_key(stem)
 
         if is_resubmission and existing:
-            if pending_path.exists():
-                count_result = await db.execute(
-                    select(ResearchVersion).where(ResearchVersion.research_id == existing.id)
-                )
-                version_num = len(count_result.scalars().all()) + 1
-                archive_path = VERSIONS_DIR / f"{stem}_v{version_num}.pdf"
-                shutil.copy(str(pending_path), str(archive_path))
+            count_result = await db.execute(
+                select(ResearchVersion).where(ResearchVersion.research_id == existing.id)
+            )
+            version_num = len(count_result.scalars().all()) + 1
+            # Archive the CURRENT pending copy before overwriting it.
+            if await asyncio.to_thread(storage_service.exists, pending_key):
+                version_key = storage_service.version_key(stem, version_num)
+                await asyncio.to_thread(storage_service.copy, pending_key, version_key)
                 db.add(ResearchVersion(
-                    research_id=existing.id, version_number=version_num, filepath=str(archive_path),
+                    research_id=existing.id, version_number=version_num, filepath=version_key,
                 ))
-            await vectorstore_service.delete_by_source(stem)
             from services.rag import rag_service
             await rag_service.clear_cache_for(existing.id, db)
 
-        shutil.move(str(staged_path), str(pending_path))
+        staged_bytes = staged_path.read_bytes()
+        await asyncio.to_thread(storage_service.upload, pending_key, staged_bytes)
+        staged_path.unlink(missing_ok=True)
 
-        pages = await asyncio.to_thread(self._extract_pages, str(pending_path))
+        pages = await asyncio.to_thread(self._extract_pages, staged_bytes)
         if not pages:
             raise ValueError("No text found in this PDF at confirm time.")
 
@@ -262,26 +305,9 @@ Document (first 3000 characters):
         if final_values.get("year"):
             meta["year_normalized"] = self._normalize_year(final_values["year"])
 
-        documents = []
-        for p in pages:
-            for chunk in self._splitter.split_text(p["text"]):
-                documents.append(Document(
-                    page_content=chunk,
-                    metadata={
-                        "title": meta.get("title", stem), "authors": meta.get("authors", "Unknown"),
-                        "year": str(meta.get("year_normalized") or "Unknown"),
-                        "college": meta.get("college", "Unknown"),
-                        "keywords": meta.get("keywords", "Unknown"),
-                        "abstract": meta.get("abstract", ""), "source": stem, "page": p["page"],
-                    }
-                ))
+        documents = await asyncio.to_thread(self.build_documents, pages, meta, stem)
 
-        indexed = True
-        try:
-            await vectorstore_service.add_documents(documents)
-        except Exception as e:
-            indexed = False
-            logger.exception("Vector indexing failed for '%s'; saving submission as pending", stem)
+        indexed = await self.index_documents(stem, documents)
 
         if is_resubmission and existing:
             existing.title = meta.get("title", stem)
@@ -291,12 +317,14 @@ Document (first 3000 characters):
             existing.abstract = meta.get("abstract", "")
             existing.status = StatusEnum.pending
             existing.feedback_note = None
+            existing.public_pdf_consent = bool(public_pdf_consent)
         else:
             db.add(Research(
                 title=meta.get("title", stem), authors=meta.get("authors", "Unknown"),
                 department=meta.get("college", "Unknown"), year=meta.get("year_normalized"),
-                abstract=meta.get("abstract", ""), source_stem=stem, filepath=str(pending_path),
+                abstract=meta.get("abstract", ""), source_stem=stem, filepath=pending_key,
                 student_id=student_id, status=StatusEnum.pending,
+                public_pdf_consent=bool(public_pdf_consent),
             ))
 
         await db.commit()

@@ -8,7 +8,7 @@ from slowapi.errors import RateLimitExceeded
 
 from database import init_db
 from config import CORS_ORIGINS
-from routers import admin_routes, ai_routes, auth_routes, research_routes
+from routers import admin_routes, ai_routes, auth_routes, kiosk_routes, research_routes
 
 limiter = Limiter(key_func=get_remote_address)
 
@@ -36,6 +36,7 @@ app.include_router(auth_routes.router)
 app.include_router(research_routes.router)
 app.include_router(admin_routes.router)
 app.include_router(ai_routes.router)
+app.include_router(kiosk_routes.router)
 
 
 @app.get("/")

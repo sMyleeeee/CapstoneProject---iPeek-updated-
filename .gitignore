@@ -6,3 +6,11 @@ backend/venv/
 # Python
 __pycache__/
 *.py[cod]
+# Secrets
+.env
+.env.*
+
+# Virtual env / local data
+venv/
+chroma_db/
+papers/

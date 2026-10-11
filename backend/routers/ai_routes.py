@@ -52,6 +52,17 @@ async def analyze_gaps(
     return await rag_service.get_research_gaps(query, research_id, db)
 
 
+@router.post("/{research_id}/imrad", response_model=ChatOut)
+async def analyze_imrad(
+    research_id: int,
+    current_user: User = Depends(require_role("student", "librarian")),
+    db: AsyncSession = Depends(get_db),
+):
+    research = await _get_research_or_404(research_id, db)
+    query = f"{research.title} {research.abstract or ''}"
+    return await rag_service.get_imrad(query, research_id, db)
+
+
 @router.post("/{research_id}/refine", response_model=ChatOut)
 async def refine_analysis(
     research_id: int,

@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>iPeek — Manage Users</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body style="visibility:hidden;">
+  <nav class="navbar">
+    <div class="nav-brand">
+      <div class="nav-logo">i</div>
+      Research Repository
+    </div>
+    <div class="nav-links"></div>
+    <div class="nav-right">
+      <a href="profile.html" class="avatar" id="avatarEl" title="View Profile"></a>
+      <span class="role-pill" id="rolePill"></span>
+      <button class="btn btn-ghost btn-sm" onclick="logout()">Sign Out</button>
+    </div>
+  </nav>
+
+  <div class="main" style="max-width:1100px;margin:0 auto;">
+
+    <div class="mb-lg">
+      <p class="text-muted greeting-sub">Librarian tools,</p>
+      <h2>Manage Users</h2>
+    </div>
+
+    <div class="users-toolbar">
+      <label class="users-toggle" for="includeInactive">
+        <input type="checkbox" id="includeInactive">
+        Include deactivated accounts
+      </label>
+      <button class="btn btn-primary" onclick="openAddUserModal()">+ Add User</button>
+    </div>
+
+    <div class="card">
+      <div class="card-header-row">
+        <h3>Student &amp; Faculty Accounts</h3>
+        <span class="text-muted text-sm" id="userCount"></span>
+      </div>
+      <div id="userList">
+        <p class="text-muted">Loading users…</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Deactivate / Reactivate confirm -->
+  <div id="confirmModal" class="modal-overlay" style="display:none;">
+    <div class="modal-box" style="max-width:420px;width:100%;">
+      <h3 class="modal-title" id="confirmTitle">Confirm</h3>
+      <p class="modal-subtitle" id="confirmMsg"></p>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" onclick="closeConfirm()">Cancel</button>
+        <button class="btn btn-danger" id="confirmOkBtn">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add user -->
+  <div id="addModal" class="modal-overlay" style="display:none;">
+    <div class="modal-box" style="max-width:460px;width:100%;">
+      <div id="addFormView">
+        <h3 class="modal-title">Add User</h3>
+        <p class="modal-subtitle">
+          The role is derived from the email domain. A secure password is
+          generated for you to hand over manually — no password needed here.
+        </p>
+        <div class="form-group">
+          <label class="form-label" for="newFullname">Full name</label>
+          <input class="form-input" id="newFullname" type="text" placeholder="Juan Dela Cruz">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="newEmail">Institutional email</label>
+          <input class="form-input" id="newEmail" type="email" placeholder="name@students.isatu.edu.ph">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="newDepartment">Department</label>
+          <select class="form-input" id="newDepartment">
+            <option value="">— None —</option>
+            <option>College of Engineering and Architecture</option>
+            <option>College of Computing and Informatics</option>
+            <option>College of Arts and Sciences</option>
+            <option>College of Industrial Technology</option>
+            <option>College of Education</option>
+          </select>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-ghost" onclick="closeAddModal()">Cancel</button>
+          <button class="btn btn-primary" id="createUserBtn" onclick="createUser()">Create account</button>
+        </div>
+      </div>
+
+      <div id="addResultView" style="display:none;">
+        <h3 class="modal-title">Account created</h3>
+        <p class="modal-subtitle" id="createdSummary"></p>
+        <div class="pw-reveal">
+          <div class="pw-reveal-label">Generated password — shown only once</div>
+          <div class="pw-reveal-code" id="generatedPw"></div>
+          <div class="pw-reveal-hint">
+            Record it now and hand it to the user. It cannot be retrieved again.
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-ghost" onclick="copyGeneratedPw()">Copy password</button>
+          <button class="btn btn-primary" onclick="closeAddModal()">Done</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-wrap" id="toasts"></div>
+
+  <script src="js/page-fade.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/pillnav.js"></script>
+  <script src="js/motion.js"></script>
+  <script src="js/users.js"></script>
+
+  <script>
+    async function logout() {
+      try { await apiLogout(); } catch {}
+      sessionStorage.clear();
+      window.location.replace("index.html");
+    }
+  </script>
+</body>
+</html>

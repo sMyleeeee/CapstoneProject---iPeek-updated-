@@ -13,15 +13,25 @@ GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 if not GROQ_API_KEY:
     raise ValueError("GROQ_API_KEY is missing from .env")
 
+# ─────────────────────────────────────────────────────────────────────────
+# Supabase (Postgres + Storage) — values come from backend .env only.
+# SUPABASE_SECRET_KEY / SUPABASE_SERVICE_ROLE_KEY is server-side ONLY:
+# never sent to the frontend, never returned in API responses, never logged.
+# ─────────────────────────────────────────────────────────────────────────
+SUPABASE_URL = os.environ.get("SUPABASE_URL")
+SUPABASE_SECRET_KEY = (
+    os.environ.get("SUPABASE_SECRET_KEY")
+    or os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+)
+STORAGE_BUCKET = "papers"   # existing PRIVATE bucket — never made public
+
 BASE_DIR   = Path(__file__).resolve().parent
-PAPERS_DIR = BASE_DIR / "papers"
 CHROMA_DIR = str(BASE_DIR / "chroma_db")
-STAGING_DIR  = PAPERS_DIR / "staging"
-PENDING_DIR  = PAPERS_DIR / "pending"
-PUBLIC_DIR   = PAPERS_DIR / "public"
-VERSIONS_DIR = PAPERS_DIR / "versions"
-for d in (STAGING_DIR, PENDING_DIR, PUBLIC_DIR, VERSIONS_DIR):
-    d.mkdir(parents=True, exist_ok=True)
+# Staged preview files (PDF + sidecar JSON) stay on local disk — they are
+# ephemeral (PREVIEW_MAX_AGE_SECONDS TTL) and pre-submission. Committed PDFs
+# live in the private Supabase Storage bucket instead (see services/storage.py).
+STAGING_DIR = BASE_DIR / "staging"
+STAGING_DIR.mkdir(parents=True, exist_ok=True)
 
 LLM_MODEL        = "openai/gpt-oss-120b"
 EMBEDDING_MODEL  = "jinaai/jina-embeddings-v2-small-en"
