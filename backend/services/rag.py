@@ -87,6 +87,30 @@ Identify 3-5 research gaps. For each:
 - Urgency: HIGH / MEDIUM / LOW
 """)
 
+IMRAD_PROMPT = PromptTemplate.from_template("""
+You are a research advisor at ISAT-U writing an IMRaD-style reading guide.
+STRICT RULE: Use ONLY the context below. Do NOT use outside knowledge.
+If nothing is relevant, say: "Not enough repository data to generate an IMRaD summary."
+""" + CITATION_RULE + """
+Context:
+{context}
+
+Proposal: {question}
+
+Structure your answer as EXACTLY four sections, each starting with its own
+line in this exact format (bold header followed by a colon):
+
+**Introduction:**
+**Methods:**
+**Results:**
+**Discussion:**
+
+Write 2-4 sentences per section covering, respectively: the background and
+purpose of the proposal; how the study was carried out; the key findings or
+expected results; and the interpretation, limitations, and implications.
+Do not add any text before, between, or after the four section headers.
+""")
+
 CHAT_PROMPT = PromptTemplate.from_template("""
 You are a research assistant for ISAT-U students and faculty.
 STRICT RULE: Answer ONLY from the context below.
@@ -231,9 +255,17 @@ class RAGService:
         await self._save_cache(research_id, "research_gaps", data, db)
         return data
 
+    async def get_imrad(self, proposal: str, research_id: int, db: AsyncSession) -> dict:
+        cached = await self._get_cached(research_id, "imrad", db)
+        if cached:
+            return cached
+        data = await self._run(IMRAD_PROMPT, proposal, db)
+        await self._save_cache(research_id, "imrad", data, db)
+        return data
+
     async def refine(self, proposal: str, target: str, research_id: int, db: AsyncSession) -> dict:
         """Re-run a specific analysis with a user-refined query. Bypasses cache."""
-        prompt_map = {"similarity": SIMILAR_PROMPT, "summary": SUMMARY_PROMPT, "gap": GAPS_PROMPT}
+        prompt_map = {"similarity": SIMILAR_PROMPT, "summary": SUMMARY_PROMPT, "gap": GAPS_PROMPT, "imrad": IMRAD_PROMPT}
         prompt = prompt_map.get(target)
         if not prompt:
             raise ValueError(f"Invalid refine target: {target}")

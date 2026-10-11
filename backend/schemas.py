@@ -39,9 +39,25 @@ class UserOut(BaseModel):
     role: RoleEnum
     department: Optional[str] = None
     contact: Optional[str] = None
+    is_active: bool = True
 
     class Config:
         from_attributes = True
+
+
+class AdminUserCreate(_EmailNormalizedBase):
+    """Librarian-created account. NO password field (generated server-side)
+    and NO role field — role is derived from the email domain, same as the
+    OTP self-registration flow."""
+    fullname: str
+    department: Optional[str] = None
+
+
+class AdminUserOut(BaseModel):
+    """Returned ONCE at creation: the plaintext generated password is only
+    in this response — never logged, never emailed, never retrievable again."""
+    user: UserOut
+    generated_password: str
 
 
 class UserUpdate(BaseModel):
@@ -84,6 +100,7 @@ class ResearchOut(BaseModel):
     source_stem: str
     status: StatusEnum
     feedback_note: Optional[str] = None
+    public_pdf_consent: bool = False
     student_id: int
     created_at: datetime
 
@@ -109,6 +126,9 @@ class UploadPreviewOut(BaseModel):
 class UploadConfirmIn(BaseModel):
     preview_id: str
     final_values: dict
+    # Required, no default — the API must reject a confirm that omits the
+    # author's explicit public-PDF choice (422 from FastAPI).
+    public_pdf_consent: bool
 
 
 # ---------- Feedback ----------

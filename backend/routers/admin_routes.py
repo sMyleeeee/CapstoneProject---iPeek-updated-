@@ -1,15 +1,20 @@
 from pathlib import Path
 from typing import List
+import secrets
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from auth import hash_password
 from config import PENDING_DIR, PUBLIC_DIR
 from database import get_db
 from dependencies import require_role
 from models import DeletionLog, Feedback, Research, RoleEnum, StatusEnum, User
-from schemas import DashboardStats, ResearchOut, UserOut, ValidateResearch
+from schemas import (
+    AdminUserCreate, AdminUserOut, DashboardStats, ResearchOut, UserOut, ValidateResearch,
+)
+from services.otp_service import determine_role_from_email
 from services.vectorstore import vectorstore_service
 
 router = APIRouter(prefix="/admin", tags=["Admin (Librarian only)"])
@@ -153,10 +158,110 @@ async def bulk_delete_research(
     return {"deleted": deleted, "failed": failed}
 
 
+async def _get_manageable_user(user_id: int, current_user: User, db: AsyncSession) -> User:
+    """Shared guard for user-management actions.
+
+    The target must exist, must be a student/faculty account (librarian
+    accounts are never manageable through this UI — no locking out other
+    librarians or yourself), and must not be the acting librarian."""
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.role == RoleEnum.librarian:
+        raise HTTPException(status_code=403, detail="Librarian accounts cannot be managed here.")
+    if user.id == current_user.id:
+        raise HTTPException(status_code=403, detail="You cannot manage your own account here.")
+    return user
+
+
 @router.get("/users", response_model=List[UserOut])
 async def manage_users(
+    include_inactive: bool = False,
     current_user: User = Depends(require_role("librarian")),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(select(User).where(User.role == RoleEnum.student))
+    """Lists manageable accounts: students AND faculty (librarians never
+    listed). Deactivated users are hidden by default but stay retrievable
+    via ?include_inactive=true for record lookups. No user rows are ever
+    deleted — deactivation is a flag flip only."""
+    stmt = select(User).where(User.role.in_([RoleEnum.student, RoleEnum.faculty]))
+    if not include_inactive:
+        stmt = stmt.where(User.is_active == True)  # noqa: E712
+    stmt = stmt.order_by(User.created_at.desc())
+    result = await db.execute(stmt)
     return result.scalars().all()
+
+
+@router.patch("/users/{user_id}/deactivate", response_model=UserOut)
+async def deactivate_user(
+    user_id: int,
+    current_user: User = Depends(require_role("librarian")),
+    db: AsyncSession = Depends(get_db),
+):
+    """SOFT-delete: sets is_active=False. Never issues a SQL DELETE and
+    never touches the user's submitted research, reviews, or feedback —
+    the submission history stays intact and attributed."""
+    user = await _get_manageable_user(user_id, current_user, db)
+    user.is_active = False
+    await db.commit()
+    await db.refresh(user)
+    return user
+
+
+@router.patch("/users/{user_id}/reactivate", response_model=UserOut)
+async def reactivate_user(
+    user_id: int,
+    current_user: User = Depends(require_role("librarian")),
+    db: AsyncSession = Depends(get_db),
+):
+    user = await _get_manageable_user(user_id, current_user, db)
+    user.is_active = True
+    await db.commit()
+    await db.refresh(user)
+    return user
+
+
+@router.post("/users", response_model=AdminUserOut, status_code=201)
+async def admin_create_user(
+    payload: AdminUserCreate,
+    current_user: User = Depends(require_role("librarian")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Creates an account on someone's behalf. No password is accepted or
+    chosen here — a cryptographically random one is generated server-side,
+    hashed with the same bcrypt path as normal registrations, and returned
+    in plaintext exactly ONCE (this response) for manual hand-off. It is
+    never logged or emailed. Role stays domain-derived: only student/faculty
+    can be created; allowlisted librarian emails are rejected (the single
+    librarian account is configured via env, not this UI)."""
+    try:
+        role = determine_role_from_email(payload.email)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    if role == RoleEnum.librarian:
+        raise HTTPException(
+            status_code=400,
+            detail="Librarian accounts are managed via environment configuration only.",
+        )
+
+    result = await db.execute(
+        select(User).where((User.username == payload.email) | (User.email == payload.email))
+    )
+    if result.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="Username or email already registered")
+
+    generated_password = secrets.token_urlsafe(16)
+    user = User(
+        username=payload.email,
+        email=payload.email,
+        password_hash=hash_password(generated_password),
+        fullname=payload.fullname,
+        role=role,
+        department=payload.department,
+    )
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+    return AdminUserOut(user=UserOut.model_validate(user), generated_password=generated_password)

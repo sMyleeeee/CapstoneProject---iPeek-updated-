@@ -120,6 +120,21 @@ function renderList(submissions) {
       card.appendChild(approvedNote);
     }
 
+    /* Uploaders keep full-PDF access to their OWN papers (backend
+       ownership exemption) — everywhere else full PDFs are kiosk-only. */
+    if (s.source_stem) {
+      const footer = document.createElement("div");
+      footer.style.cssText = "display:flex;justify-content:flex-end;margin-top:8px;";
+
+      const viewBtn = document.createElement("button");
+      viewBtn.className   = "btn btn-ghost btn-sm";
+      viewBtn.textContent = "View Full PDF";
+      viewBtn.addEventListener("click", () => viewPdfInNewTab(apiPdfUrl(s.source_stem)));
+      footer.appendChild(viewBtn);
+
+      card.appendChild(footer);
+    }
+
     list.appendChild(card);
   });
 

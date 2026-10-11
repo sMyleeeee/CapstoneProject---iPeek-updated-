@@ -40,11 +40,32 @@
       <div class="abstract-text" id="abstractText">Loading...</div>
     </div>
 
-    <!-- PDF trigger card -->
-    <div class="card" style="margin-bottom:14px;" id="pdfViewerTrigger">
-      <button class="btn btn-accent btn-full" onclick="revealPdfViewer()">
-        Read Full Version
+    <!-- Full-document card — restored from the old #pdfViewerTrigger slot.
+         Shown ONLY when the author gave submission-time public_pdf_consent;
+         otherwise hidden (remote viewers get the IMRaD card below instead). -->
+    <div class="card" id="pdfViewerTrigger" style="display:none;margin-bottom:14px;">
+      <button class="btn btn-accent btn-full" onclick="readFullVersion()">
+        📄 Read Full Version
       </button>
+    </div>
+
+    <!-- IMRaD card — occupies the slot where the full-document viewer
+         (#pdfViewerCard) used to render. Shown ONLY when the author did
+         NOT give public_pdf_consent: remote viewers see the IMRaD summary
+         instead of the full PDF. Hidden entirely when consent was given.
+         Sits BETWEEN the Abstract and the AI refine bar. -->
+    <div class="card" id="imradViewerCard" style="display:none;margin-bottom:14px;">
+      <div class="section-label">IMRaD Summary</div>
+      <p class="text-muted text-sm" style="margin-bottom:10px;">
+        The author did not permit remote viewing of the full PDF — this
+        AI-generated summary is shown instead. The complete document
+        remains available in-person at the Library Viewing Station.
+      </p>
+      <div class="ai-box" id="imradBox">
+        <div style="display:flex;align-items:center;gap:8px;color:var(--muted);">
+          <div class="spinner"></div>
+        </div>
+      </div>
     </div>
 
     <!-- AI refine bar -->
@@ -59,23 +80,6 @@
         <input id="refineInput" class="form-input refine-input" placeholder="Ask AI to expand or refocus the analysis...">
         <button id="refineBtn" class="btn btn-accent" onclick="refineAnalysis()">Refine</button>
       </div>
-    </div>
-
-    <!-- PDF viewer card (hidden by default) -->
-    <div class="card" id="pdfViewerCard" style="display:none;margin-bottom:14px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-        <h3 style="font-size:0.9rem;">Document Viewer</h3>
-        <div style="display:flex;align-items:center;gap:8px;">
-          <button class="btn btn-ghost btn-sm" onclick="pdfPrevPage()" id="pdfPrevBtn">‹ Prev</button>
-          <span id="pdfPageInfo" style="font-size:0.78rem;color:var(--muted);">Page — / —</span>
-          <button class="btn btn-ghost btn-sm" onclick="pdfNextPage()" id="pdfNextBtn">Next ›</button>
-          <button class="btn btn-ghost btn-sm" onclick="hidePdfViewer()">✕ Hide</button>
-        </div>
-      </div>
-      <div style="background:var(--bg);border-radius:var(--radius);overflow:hidden;text-align:center;padding:4px;">
-        <canvas id="pdfCanvas" style="max-width:100%;display:block;margin:0 auto;"></canvas>
-      </div>
-      <div id="pdfError" style="display:none;padding:20px;text-align:center;color:var(--danger);font-size:0.84rem;"></div>
     </div>
 
     <!-- AI Analysis card -->
@@ -120,36 +124,15 @@
 
   </div>
 
-  <!-- Mobile PDF full-screen overlay -->
-  <div class="pdf-overlay" id="pdfOverlay">
-    <div class="pdf-overlay-header">
-      <span style="font-weight:600;font-size:0.9rem;">Document Viewer</span>
-      <div style="display:flex;align-items:center;gap:8px;">
-        <button class="btn btn-ghost btn-sm" onclick="pdfPrevPage()" id="pdfPrevBtnOv">‹ Prev</button>
-        <span id="pdfPageInfoOv" style="font-size:0.78rem;color:var(--muted);">Page — / —</span>
-        <button class="btn btn-ghost btn-sm" onclick="pdfNextPage()" id="pdfNextBtnOv">Next ›</button>
-        <button class="btn btn-ghost btn-sm" onclick="closePdfOverlay()">✕ Close</button>
-      </div>
-    </div>
-    <div class="pdf-overlay-body">
-      <canvas id="pdfCanvasOverlay" style="max-width:100%;display:block;"></canvas>
-    </div>
-  </div>
-
   <div class="toast-wrap" id="toasts"></div>
 
   <script src="js/page-fade.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="js/api.js"></script>
   <script src="js/pillnav.js"></script>
   <script src="js/motion.js"></script>
   <script src="js/detail.js"></script>
 
   <script>
-    function closePdfOverlay() {
-      document.getElementById("pdfOverlay").classList.remove("open");
-    }
-
     async function logout() {
       try { await apiLogout(); } catch {}
       sessionStorage.clear();

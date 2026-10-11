@@ -2220,6 +2220,74 @@ body.page-fade-in {
   margin-bottom: 16px;
 }
 
+/* ── Step 3 review + public-PDF consent (in-flow, upload.html) ── */
+/* Not a nested .card: this is content INSIDE the page's existing
+   neomorphic card, per the consent-gate spec (no floating overlay). */
+.review-card {
+  margin-top: 4px;
+}
+
+.consent-block {
+  background: var(--bg);
+  border: 1px solid rgba(0,0,0,0.05);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-inset-sm);
+  padding: 16px 18px;
+  margin-bottom: 18px;
+}
+
+.consent-text {
+  font-size: 0.82rem;
+  line-height: 1.65;
+  color: var(--text);
+  white-space: pre-wrap;
+  margin-bottom: 14px;
+}
+
+.consent-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.consent-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--card);
+  border: 1px solid var(--border, rgba(0,0,0,0.08));
+  border-radius: var(--radius-sm);
+  padding: 11px 14px;
+  font-size: 0.86rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: box-shadow 0.15s, border-color 0.15s;
+}
+
+.consent-option:hover { border-color: var(--accent); }
+
+.consent-option:has(input:checked) {
+  border-color: var(--accent);
+  box-shadow: var(--shadow-inset-sm);
+}
+
+.consent-option input[type="radio"] {
+  accent-color: var(--accent);
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.consent-hint {
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin-top: 10px;
+}
+
+.consent-hint.selected { color: var(--primary); font-weight: 600; }
+
 /* ── Empty detail text ─────────────────────────────────────── */
 .empty-detail-title {
   font-weight: 600;
@@ -2280,4 +2348,97 @@ body.page-fade-in {
     width: 100%;
     justify-content: center;
   }
+}
+
+/* ── User management (users.html) ─────────────────────────── */
+.badge-student  { background: rgba(42,74,127,0.12);  color: var(--primary); }
+.badge-faculty  { background: rgba(212,168,0,0.16);  color: var(--accent-dk); }
+.badge-active   { background: rgba(22,163,74,0.14);  color: var(--success); }
+.badge-inactive { background: rgba(0,0,0,0.06);      color: var(--muted); }
+
+.users-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.users-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.8rem;
+  color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+}
+.users-toggle input { accent-color: var(--primary); cursor: pointer; }
+
+.user-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.user-row:last-child { border: none; }
+
+.user-row-name { font-size: 0.88rem; font-weight: 600; }
+.user-row-meta { font-size: 0.74rem; color: var(--muted); margin-top: 2px; word-break: break-all; }
+
+.user-row-tags,
+.user-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pw-reveal {
+  background: var(--bg);
+  border: 1px dashed var(--accent);
+  border-radius: var(--radius-sm);
+  padding: 16px;
+  margin: 14px 0;
+  text-align: center;
+}
+
+.pw-reveal-code {
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--primary);
+  word-break: break-all;
+  user-select: all;
+}
+
+.pw-reveal-hint {
+  font-size: 0.78rem;
+  color: var(--warning);
+  margin-top: 8px;
+}
+
+.pw-reveal-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+@media (max-width: 580px) {
+  .user-row { flex-direction: column; align-items: flex-start; }
+  .modal-actions .btn { flex: 1; justify-content: center; }
 }

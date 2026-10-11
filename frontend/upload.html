@@ -55,37 +55,108 @@
       </div>
 
       <!-- Drag and drop zone -->
-      <div class="drop-zone"
-           id="dropZone"
-           onclick="document.getElementById('fileInput').click()"
-           ondragover="dragOver(event)"
-           ondragleave="dragLeave(event)"
-           ondrop="dropped(event)">
-        <div class="drop-icon">📄</div>
-        <div class="drop-text">
-          <strong>Drag &amp; drop your PDF here</strong><br>
-          or <span>click to browse files</span> — max 25MB
+      <div id="step1Pane">
+        <div class="drop-zone"
+             id="dropZone"
+             onclick="document.getElementById('fileInput').click()"
+             ondragover="dragOver(event)"
+             ondragleave="dragLeave(event)"
+             ondrop="dropped(event)">
+          <div class="drop-icon">📄</div>
+          <div class="drop-text">
+            <strong>Drag &amp; drop your PDF here</strong><br>
+            or <span>click to browse files</span> — max 25MB
+          </div>
+          <input type="file" id="fileInput" accept=".pdf" style="display:none" onchange="fileChosen(event)">
         </div>
-        <input type="file" id="fileInput" accept=".pdf" style="display:none" onchange="fileChosen(event)">
+
+        <!-- File info chip -->
+        <div id="fileInfo" class="file-info-chip" style="display:none;">
+          <span>📄</span>
+          <span id="fileName" class="file-name"></span>
+          <span id="fileSize" class="file-size"></span>
+          <button class="btn btn-ghost btn-sm" onclick="viewSelectedFile()" title="Preview PDF">👁 View</button>
+          <button class="btn-clear" onclick="clearFile()" title="Remove file">✕</button>
+        </div>
+
+        <!-- Status message -->
+        <div id="submitStatus" style="display:none;" class="mt-md"></div>
+
+        <div class="form-actions mt-lg">
+          <div></div>
+          <button class="btn btn-accent btn-lg" id="submitBtn" onclick="submitPaper()">
+            Submit Research →
+          </button>
+        </div>
       </div>
 
-      <!-- File info chip -->
-      <div id="fileInfo" class="file-info-chip" style="display:none;">
-        <span>📄</span>
-        <span id="fileName" class="file-name"></span>
-        <span id="fileSize" class="file-size"></span>
-        <button class="btn btn-ghost btn-sm" onclick="viewSelectedFile()" title="Preview PDF">👁 View</button>
-        <button class="btn-clear" onclick="clearFile()" title="Remove file">✕</button>
-      </div>
+      <!-- Step 3: Review + public-PDF consent — in-flow content, NOT a
+           dismissible modal, so the consent choice can't be skipped by
+           clicking outside. Hidden until AI extraction completes. -->
+      <div id="step3Review" class="review-card" style="display:none;">
+        <div class="section-label">Step 3 — Review &amp; Submit</div>
+        <p class="text-muted text-sm">
+          Review the extracted details below. This is what will be submitted for librarian review.
+        </p>
 
-      <!-- Status message -->
-      <div id="submitStatus" style="display:none;" class="mt-md"></div>
+        <div class="meta-grid">
+          <div>
+            <span class="text-muted">Title:</span><br>
+            <strong id="metaTitle">—</strong>
+          </div>
+          <div>
+            <span class="text-muted">Authors:</span><br>
+            <strong id="metaAuthors">—</strong>
+          </div>
+          <div>
+            <span class="text-muted">Year:</span><br>
+            <strong id="metaYear">—</strong>
+          </div>
+          <div>
+            <span class="text-muted">College / Department:</span><br>
+            <strong id="metaCollege">—</strong>
+          </div>
+          <div>
+            <span class="text-muted">Abstract:</span><br>
+            <span id="metaAbstract" class="text-sm">—</span>
+          </div>
+          <div>
+            <span class="text-muted">Keywords:</span><br>
+            <span id="metaKeywords">—</span>
+          </div>
+        </div>
 
-      <div class="form-actions mt-lg">
-        <div></div>
-        <button class="btn btn-accent btn-lg" id="submitBtn" onclick="submitPaper()">
-          Submit Research →
-        </button>
+        <!-- Consent gate — text injected from consent-text.js (single
+             swappable source). Two explicit radios, no implicit default:
+             Confirm & Submit stays disabled until one is selected. -->
+        <div class="consent-block">
+          <div class="consent-text" id="consentText"></div>
+
+          <div class="consent-options">
+            <label class="consent-option">
+              <input type="radio" name="publicPdfConsent" value="true" onchange="onConsentChange(this)">
+              <span>I permit public viewing</span>
+            </label>
+            <label class="consent-option">
+              <input type="radio" name="publicPdfConsent" value="false" onchange="onConsentChange(this)">
+              <span>I do not permit public viewing</span>
+            </label>
+          </div>
+
+          <div class="consent-hint" id="consentHint">Select one option to continue.</div>
+        </div>
+
+        <div id="step3Status" style="display:none;" class="mt-md"></div>
+
+        <div class="form-actions">
+          <div class="flex-gap">
+            <button class="btn btn-ghost" onclick="cancelMetaConfirm()">Cancel</button>
+            <button class="btn btn-ghost" onclick="viewUploadedPdf()">📄 View Uploaded PDF</button>
+          </div>
+          <button class="btn btn-accent btn-lg" id="confirmMetaBtn" onclick="confirmMetaAndSubmit()" disabled>
+            Confirm & Submit →
+          </button>
+        </div>
       </div>
 
     </div>
@@ -93,61 +164,11 @@
 
   <div class="toast-wrap" id="toasts"></div>
 
-  <!-- AI Metadata Confirmation Modal -->
-  <div id="metaModal" class="modal-overlay" style="display:none;">
-    <div class="modal-box" style="max-width:520px;width:100%;">
-
-      <h3 class="modal-title">
-        Here's what we found in your PDF
-      </h3>
-      <p class="text-muted modal-subtitle">
-        Review the extracted details below. This is what will be submitted for librarian review.
-      </p>
-
-      <div class="meta-grid">
-        <div>
-          <span class="text-muted">Title:</span><br>
-          <strong id="metaTitle">—</strong>
-        </div>
-        <div>
-          <span class="text-muted">Authors:</span><br>
-          <strong id="metaAuthors">—</strong>
-        </div>
-        <div>
-          <span class="text-muted">Year:</span><br>
-          <strong id="metaYear">—</strong>
-        </div>
-        <div>
-          <span class="text-muted">College / Department:</span><br>
-          <strong id="metaCollege">—</strong>
-        </div>
-        <div>
-          <span class="text-muted">Abstract:</span><br>
-          <span id="metaAbstract" class="text-sm">—</span>
-        </div>
-        <div>
-          <span class="text-muted">Keywords:</span><br>
-          <span id="metaKeywords">—</span>
-        </div>
-      </div>
-
-      <div class="form-actions">
-        <div class="flex-gap">
-          <button class="btn btn-ghost" onclick="cancelMetaConfirm()">Cancel</button>
-          <button class="btn btn-ghost" onclick="viewUploadedPdf()">📄 View Uploaded PDF</button>
-        </div>
-        <button class="btn btn-accent btn-lg" id="confirmMetaBtn" onclick="confirmMetaAndSubmit()">
-          Confirm & Submit →
-        </button>
-      </div>
-
-    </div>
-  </div>
-
   <script src="js/page-fade.js"></script>
   <script src="js/api.js"></script>
   <script src="js/pillnav.js"></script>
   <script src="js/motion.js"></script>
+  <script src="js/consent-text.js"></script>
   <script src="js/upload.js"></script>
 
   <script>

@@ -203,7 +203,8 @@ Document (first 3000 characters):
     # ── CONFIRM ──────────────────────────────────────────────────────
 
     async def confirm_upload(
-        self, preview_id: str, final_values: dict, student_id: int, db: AsyncSession
+        self, preview_id: str, final_values: dict, public_pdf_consent: bool,
+        student_id: int, db: AsyncSession
     ) -> dict:
         import asyncio
 
@@ -291,12 +292,14 @@ Document (first 3000 characters):
             existing.abstract = meta.get("abstract", "")
             existing.status = StatusEnum.pending
             existing.feedback_note = None
+            existing.public_pdf_consent = bool(public_pdf_consent)
         else:
             db.add(Research(
                 title=meta.get("title", stem), authors=meta.get("authors", "Unknown"),
                 department=meta.get("college", "Unknown"), year=meta.get("year_normalized"),
                 abstract=meta.get("abstract", ""), source_stem=stem, filepath=str(pending_path),
                 student_id=student_id, status=StatusEnum.pending,
+                public_pdf_consent=bool(public_pdf_consent),
             ))
 
         await db.commit()
