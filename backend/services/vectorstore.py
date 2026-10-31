@@ -22,6 +22,21 @@ from config import CHROMA_DIR, CHROMA_COLLECTION, EMBEDDING_MODEL
 logger = logging.getLogger(__name__)
 
 
+def build_source_filter(approved_sources, exclude_source: str | None = None) -> dict:
+    """Chroma metadata filter for retrieval.
+
+    Without exclude_source this is the historical
+    {"source": {"$in": [...]}} filter. With it, an extra $ne clause keeps
+    the current paper's own chunks out of its similarity results — every
+    other analysis (summary, IMRaD, gaps, refine) passes None and still
+    sees the paper's own text.
+    """
+    sources_filter = {"source": {"$in": list(approved_sources)}}
+    if not exclude_source:
+        return sources_filter
+    return {"$and": [sources_filter, {"source": {"$ne": exclude_source}}]}
+
+
 class VectorStoreService:
     def __init__(self):
         logger.info(f"Loading FastEmbed embedding model: {EMBEDDING_MODEL}")
@@ -57,14 +72,25 @@ class VectorStoreService:
                 return 0
         return await asyncio.to_thread(_count)
 
+    async def count_chunks(self) -> int:
+        """Strict counterpart of get_chunk_count(): raises when the vector
+        store is unreachable, so callers can report "unknown" instead of a
+        false 0. get_chunk_count keeps its 0 fallback for reindex_chroma's
+        end-of-run summary."""
+        def _count():
+            return self._store._collection.count()
+        return await asyncio.to_thread(_count)
+
     async def similarity_search(
-        self, query: str, k: int, approved_sources: set, score_threshold: float
+        self, query: str, k: int, approved_sources: set, score_threshold: float,
+        exclude_source: str | None = None,
     ) -> list:
         def _search():
             if not approved_sources:
                 return []
             docs_and_scores = self._store.similarity_search_with_relevance_scores(
-                query, k=k, filter={"source": {"$in": list(approved_sources)}}
+                query, k=k,
+                filter=build_source_filter(approved_sources, exclude_source),
             )
             return [doc for doc, score in docs_and_scores if score >= score_threshold]
         return await asyncio.to_thread(_search)

@@ -24,7 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import (
     SMTP_HOST, SMTP_PORT, SMTP_USERNAME, SMTP_PASSWORD,
-    OTP_EXPIRE_MINUTES, OTP_MAX_ATTEMPTS,
+    OTP_EXPIRE_MINUTES, OTP_MAX_ATTEMPTS, OTP_RESEND_COOLDOWN_SECONDS,
     STUDENT_EMAIL_DOMAIN, STAFF_EMAIL_DOMAIN, LIBRARIAN_EMAILS,
 )
 from models import OTPVerification, RoleEnum
@@ -94,6 +94,52 @@ def _send_email_sync(to_email: str, code: str) -> None:
         server.send_message(msg)
 
 
+def _send_password_email_sync(to_email: str, password: str) -> None:
+    """Delivers the auto-generated password ONCE, right after account
+    creation. Blocking SMTP send — always call via asyncio.to_thread().
+    SECURITY: the plaintext password lives only in this message body —
+    never logged, never in the subject, never stored anywhere."""
+    msg = MIMEText(
+        f"Your iPeek account has been created.\n\n"
+        f"Email: {to_email}\n"
+        f"Password: {password}\n\n"
+        f"After your first login, change this password from your Profile "
+        f"page, then delete this email.\n"
+        f"If you didn't create this account, please contact the library."
+    )
+    msg["Subject"] = "iPeek — Your account password"
+    msg["From"] = SMTP_USERNAME
+    msg["To"] = to_email
+
+    with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
+        server.starttls()
+        server.login(SMTP_USERNAME, SMTP_PASSWORD)
+        server.send_message(msg)
+
+
+def _send_password_reset_email_sync(to_email: str, password: str) -> None:
+    """Self-service reset: delivers the NEW generated password. Blocking —
+    always call via asyncio.to_thread(). SECURITY: the plaintext password
+    lives only in this message body — never logged, never in the subject,
+    never stored anywhere."""
+    msg = MIMEText(
+        f"Your iPeek password has been reset.\n\n"
+        f"Email: {to_email}\n"
+        f"New password: {password}\n\n"
+        f"Sign in and change this password from your Profile page, then "
+        f"delete this email.\n"
+        f"If you didn't request this reset, contact the library immediately."
+    )
+    msg["Subject"] = "iPeek — Your password was reset"
+    msg["From"] = SMTP_USERNAME
+    msg["To"] = to_email
+
+    with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
+        server.starttls()
+        server.login(SMTP_USERNAME, SMTP_PASSWORD)
+        server.send_message(msg)
+
+
 class OTPService:
 
     async def request_otp(self, email: str, db: AsyncSession) -> None:
@@ -106,17 +152,32 @@ class OTPService:
         # silently "succeeding" for an address that could never register.
         determine_role_from_email(email)
 
+        # Per-email resend cooldown (registration AND password reset share
+        # this path): a code issued less than OTP_RESEND_COOLDOWN_SECONDS
+        # ago must not be replaced yet. Prevents mail-bombing one address.
+        result = await db.execute(
+            select(OTPVerification)
+            .where(
+                OTPVerification.email == email,
+                OTPVerification.verified == False,  # noqa: E712
+            )
+            .order_by(OTPVerification.created_at.desc())
+        )
+        pending = list(result.scalars().all())
+        newest = pending[0] if pending else None
+        if newest and newest.created_at:
+            elapsed = (datetime.utcnow() - newest.created_at).total_seconds()
+            if 0 <= elapsed < OTP_RESEND_COOLDOWN_SECONDS:
+                wait = int(OTP_RESEND_COOLDOWN_SECONDS - elapsed) + 1
+                raise ValueError(
+                    f"Please wait {wait} seconds before requesting another code."
+                )
+
         code = _generate_code()
 
         # Invalidate any previous unverified OTPs for this email so only
         # the newest code is valid.
-        result = await db.execute(
-            select(OTPVerification).where(
-                OTPVerification.email == email,
-                OTPVerification.verified == False,  # noqa: E712
-            )
-        )
-        for old in result.scalars().all():
+        for old in pending:
             await db.delete(old)
 
         record = OTPVerification(
@@ -152,7 +213,7 @@ class OTPService:
         if record.attempts >= OTP_MAX_ATTEMPTS:
             raise ValueError("Too many incorrect attempts. Please request a new code.")
 
-        if _hash_code(code) != record.code_hash:
+        if not secrets.compare_digest(_hash_code(code), record.code_hash):
             record.attempts += 1
             await db.commit()
             raise ValueError("Incorrect code.")
@@ -160,6 +221,57 @@ class OTPService:
         record.verified = True
         await db.commit()
         return True
+
+    async def send_generated_password_email(self, to_email: str, password: str) -> None:
+        """Emails the freshly generated password to the verified address.
+        Raises ValueError on failure so the caller can roll back account
+        creation — never leave a user with an unknown password."""
+        try:
+            await asyncio.to_thread(_send_password_email_sync, to_email, password)
+        except Exception as e:
+            # Log the address and the exception only — NEVER the password.
+            logger.error(f"Failed to send password email to {to_email}: {e}")
+            raise ValueError(
+                "We couldn't email your password, so no account was created. "
+                "Please try verifying again."
+            )
+
+    async def send_password_reset_email(self, to_email: str, password: str) -> None:
+        """Emails the NEW password generated by a self-service reset. Raises
+        ValueError on failure so the caller can roll back the password change
+        and keep the old password working."""
+        try:
+            await asyncio.to_thread(_send_password_reset_email_sync, to_email, password)
+        except Exception as e:
+            # Log the address and the exception only — NEVER the password.
+            logger.error(f"Failed to send password-reset email to {to_email}: {e}")
+            raise ValueError("Could not send the new password by email.")
+
+    async def consume(self, email: str, db: AsyncSession) -> None:
+        """Deletes every OTP row for this email after a successful password
+        reset (and when a reset cannot proceed) so a code is single-use."""
+        email = email.strip().lower()
+        result = await db.execute(
+            select(OTPVerification).where(OTPVerification.email == email)
+        )
+        for record in result.scalars().all():
+            await db.delete(record)
+        await db.commit()
+
+    async def unconsume(self, email: str, db: AsyncSession) -> None:
+        """Rolls a verified OTP back to unverified so the same code can be
+        re-submitted (used when account creation fails after verification,
+        e.g. the password email could not be sent)."""
+        email = email.strip().lower()
+        result = await db.execute(
+            select(OTPVerification)
+            .where(OTPVerification.email == email, OTPVerification.verified == True)  # noqa: E712
+            .order_by(OTPVerification.created_at.desc())
+        )
+        record = result.scalars().first()
+        if record:
+            record.verified = False
+            await db.commit()
 
     async def is_email_verified(self, email: str, db: AsyncSession) -> bool:
         """Called by /auth/register to confirm this email completed OTP

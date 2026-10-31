@@ -38,6 +38,7 @@ const COLLEGE_MAP = {
   CEA: ["engineering", "architecture"],
   CIT: ["industrial", "technology"],
   COE: ["education"],
+  CGBE: ["global", "business", "enterprise"],
 };
 
 /* ── Safe string helper ──────────────────────────────────────────────────── */

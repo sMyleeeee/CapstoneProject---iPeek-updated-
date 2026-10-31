@@ -83,186 +83,38 @@ async function login() {
 /* ── Register — Step 1: collect details, request OTP ─────────────────── */
 
 async function sendOtp() {
-
-  console.log("========== SEND OTP START ==========");
-
   const fullname = document.getElementById("regFullname").value.trim();
   const email    = document.getElementById("regEmail").value.trim();
   const dept     = document.getElementById("regDept").value;
-  const pwd      = document.getElementById("regPwd").value;
-  const pwd2     = document.getElementById("regPwd2").value;
 
-  console.log("fullname:", fullname);
-  console.log("email:", email);
-  console.log("dept:", dept);
-  console.log("password length:", pwd.length);
-  console.log("password confirmation length:", pwd2.length);
-
-
-  // ------------------------------------------------------------
-  // VALIDATION
-  // ------------------------------------------------------------
-
-  if (!fullname || !email || !pwd) {
-
-    console.log("STOPPED: missing required field");
-
-    showErr(
-      "regErr",
-      "Please fill in all required fields."
-    );
-
+  if (!fullname || !email) {
+    showErr("regErr", "Please fill in your full name and institutional email.");
     return;
   }
 
-
-  if (pwd.length < 8) {
-
-    console.log("STOPPED: password too short");
-
-    showErr(
-      "regErr",
-      "Password must be at least 8 characters."
-    );
-
-    return;
-  }
-
-
-  if (pwd !== pwd2) {
-
-    console.log("STOPPED: passwords don't match");
-
-    showErr(
-      "regErr",
-      "Passwords do not match."
-    );
-
-    return;
-  }
-
-
-  console.log("========== VALIDATION PASSED ==========");
-
-
-  // ------------------------------------------------------------
-  // STORE REGISTRATION DATA
-  // ------------------------------------------------------------
-
+  // Non-secret details only — NO password is collected or chosen here.
+  // The server generates one after OTP verification and emails it.
   pendingRegistration = {
     fullname: fullname,
     email: email,
-    department: dept || null,
-    password: pwd
+    department: dept || null
   };
-
   pendingEmail = email;
 
-  console.log(
-    "pendingRegistration:",
-    pendingRegistration
-  );
-
-  console.log(
-    "pendingEmail:",
-    pendingEmail
-  );
-
-
-  // ------------------------------------------------------------
-  // BUTTON
-  // ------------------------------------------------------------
-
-  const btn =
-    document.getElementById("sendCodeBtn");
-
-  console.log(
-    "Button found:",
-    btn
-  );
-
-
+  const btn = document.getElementById("sendCodeBtn");
   btn.disabled = true;
-
   btn.textContent = "Sending code...";
 
-
-  console.log(
-    "========== ABOUT TO CALL apiRequestOtp =========="
-  );
-
-  console.log(
-    "Email being sent:",
-    email
-  );
-
-
-  // ------------------------------------------------------------
-  // OTP REQUEST
-  // ------------------------------------------------------------
-
   try {
-
-    console.log(
-      "Calling apiRequestOtp NOW..."
-    );
-
-    const result =
-      await apiRequestOtp(email);
-
-    console.log(
-      "========== API REQUEST SUCCESS =========="
-    );
-
-    console.log(
-      "Backend response:",
-      result
-    );
-
-
-    pendingEmail = email;
-
-    console.log(
-      "Calling showOtpStep()..."
-    );
-
+    await apiRequestOtp(email);
     showOtpStep(email);
-
-    console.log(
-      "========== OTP PANEL SHOULD NOW BE VISIBLE =========="
-    );
-
-  }
-
-  catch (e) {
-
-    console.error(
-      "========== OTP REQUEST FAILED =========="
-    );
-
-    console.error(e);
-
-    showErr(
-      "regErr",
-      e.message ||
-      "Could not send verification code."
-    );
-
-  }
-
-  finally {
-
-    console.log(
-      "========== SEND OTP FINALLY =========="
-    );
-
+  } catch (e) {
+    console.error("OTP request failed:", e);
+    showErr("regErr", e.message || "Could not send verification code.");
+  } finally {
     btn.disabled = false;
-
-    btn.textContent =
-      "Send Verification Code";
-
+    btn.textContent = "Send Verification Code";
   }
-
 }
 
 /* ── Register — Step 2: verify OTP, then create the account ─────────── */
@@ -286,6 +138,8 @@ async function verifyAndRegister() {
 
   try {
     await apiVerifyOtp(pendingEmail, code);
+    // No password is sent — the server generates one after verification
+    // and emails it to the verified address.
     await apiRegister(pendingRegistration);
 
     const registeredEmail = pendingEmail;
@@ -293,7 +147,10 @@ async function verifyAndRegister() {
     pendingRegistration = null;
     document.getElementById("otpCode").value = "";
     showLogin();
-    showErr("loginErr", `Account created for ${registeredEmail}. You can now sign in.`);
+    showErr(
+      "loginErr",
+      `Your account is ready for ${registeredEmail}. We sent your password to your email — you can now sign in.`
+    );
   } catch (e) {
     showErr("otpErr", e.message || "Could not verify the code or create your account.");
   } finally {

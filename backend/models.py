@@ -43,6 +43,10 @@ class User(Base):
     department = Column(String(100), nullable=True)
     contact = Column(String(50), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+    # Soft-delete flag — NEVER delete user rows (institutional record-keeping).
+    # False = deactivated: cannot log in, hidden from the default user list,
+    # but their submissions/review history stay intact and visible.
+    is_active = Column(Boolean, default=True, nullable=False)
 
     research_uploaded = relationship(
         "Research", back_populates="student", foreign_keys="Research.student_id"
@@ -52,6 +56,19 @@ class User(Base):
     )
     feedback_sent = relationship("Feedback", back_populates="librarian")
     notifications = relationship("Notification", back_populates="user")
+
+
+class College(Base):
+    """Canonical institution structure (the CURRENT one — archive PDFs may
+    still print older college names; the folder/college assignment wins).
+
+    Seeded idempotently by services.colleges.seed_colleges() from init_db().
+    """
+    __tablename__ = "colleges"
+
+    id = Column(Integer, primary_key=True, index=True)
+    code = Column(String(16), unique=True, nullable=False, index=True)   # CAS, CCI, CIT, COE, CEA, CGBE
+    name = Column(String(100), unique=True, nullable=False)
 
 
 class Research(Base):
@@ -64,9 +81,16 @@ class Research(Base):
     source_stem = Column(String(255), unique=True, nullable=False, index=True)
     authors = Column(String(255), nullable=False)
     department = Column(String(100), nullable=False)
+    # Nullable on purpose: "Unknown" college never blocks a submission.
+    # NO relationship("College") — asyncpg would lazy-load and raise.
+    college_id = Column(Integer, ForeignKey("colleges.id"), nullable=True)
     abstract = Column(Text, nullable=True)
     feedback_note = Column(Text, nullable=True)
     status = Column(Enum(StatusEnum), default=StatusEnum.pending, nullable=False)
+    # Author's submission-time choice for REMOTE visibility of the full PDF.
+    # No server-side default: always set explicitly by confirm_upload.
+    # Does NOT affect Library Kiosk (in-person) viewing.
+    public_pdf_consent = Column(Boolean, nullable=False)
 
     student_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     reviewed_by = Column(Integer, ForeignKey("users.id"), nullable=True)
@@ -137,7 +161,29 @@ class AIAnalysis(Base):
     summary = Column(Text, nullable=True)
     similar_studies = Column(Text, nullable=True)
     research_gaps = Column(Text, nullable=True)
+    imrad = Column(Text, nullable=True)      # Introduction/Methods/Results/Discussion
     sources = Column(Text, nullable=True)   # ← NEW: JSON list, only populated by similarity search
     created_at = Column(DateTime, default=datetime.utcnow)
 
     research = relationship("Research", back_populates="ai_analysis")
+
+
+class KioskSession(Base):
+    """
+    Session-scoped Library Viewing Station state, keyed by the JWT's
+    per-login "sid" claim — NOT by user id and NOT by role.
+
+    Locking one sid can only ever affect that one login session: a
+    librarian's own session on their own device has a different sid, so
+    it is structurally unreachable from here.
+    """
+    __tablename__ = "kiosk_sessions"
+
+    sid = Column(String(64), primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    is_kiosk = Column(Boolean, default=False, nullable=False)
+    locked = Column(Boolean, default=False, nullable=False)
+    locked_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    user = relationship("User", foreign_keys=[user_id])

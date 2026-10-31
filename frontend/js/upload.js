@@ -184,7 +184,7 @@ async function submitPaper() {
   status.style.cssText =
     "display:block;padding:12px 14px;border-radius:var(--radius-sm);" +
     "font-size:0.84rem;color:var(--muted);" +
-    "background:var(--bg);box-shadow:var(--neo-inset);";
+    "background:var(--bg);box-shadow:var(--shadow-inset-sm);";
 
   status.textContent =
     "Extracting metadata from your PDF... please don't close or navigate away.";
@@ -212,14 +212,14 @@ async function submitPaper() {
 
     btn.style.display = "none";
 
-    showMetaModal(preview.ai_metadata);
+    showStep3Review(preview.ai_metadata);
     setStep(3);
 
   } catch (e) {
     status.style.cssText =
       "display:block;padding:12px 14px;border-radius:var(--radius-sm);" +
       "font-size:0.84rem;color:var(--danger);" +
-      "background:#fef2f2;box-shadow:var(--neo-inset);";
+      "background:#fef2f2;box-shadow:var(--shadow-inset-sm);";
 
     status.textContent = e.message;
 
@@ -233,9 +233,9 @@ async function submitPaper() {
 }
 
 
-/* ── Modal: show AI-extracted metadata ──────────────────────────────── */
+/* ── Step 3: in-flow review + public-PDF consent ─────────────────────── */
 
-function showMetaModal(meta) {
+function showStep3Review(meta) {
   document.getElementById("metaTitle").textContent =
     meta.title || "—";
 
@@ -254,16 +254,54 @@ function showMetaModal(meta) {
   document.getElementById("metaKeywords").textContent =
     meta.keywords || "—";
 
-  const modal = document.getElementById("metaModal");
-  modal.style.display = "flex";
+  /* Consent statement comes from the single swappable constant in
+     consent-text.js — never hardcoded here. */
+  const consentEl = document.getElementById("consentText");
+  if (consentEl) {
+    consentEl.textContent =
+      typeof PUBLIC_PDF_CONSENT_STATEMENT === "string"
+        ? PUBLIC_PDF_CONSENT_STATEMENT
+        : "Consent statement unavailable.";
+  }
+
+  /* No implicit default: clear any prior choice and keep Confirm
+     disabled until the user actively selects one option. */
+  document.querySelectorAll('input[name="publicPdfConsent"]').forEach(r => {
+    r.checked = false;
+  });
+  document.getElementById("confirmMetaBtn").disabled = true;
+  const hint = document.getElementById("consentHint");
+  if (hint) {
+    hint.textContent = "Select one option to continue.";
+    hint.classList.remove("selected");
+  }
+
+  const s3status = document.getElementById("step3Status");
+  if (s3status) s3status.style.display = "none";
+
+  document.getElementById("step1Pane").style.display = "none";
+  document.getElementById("step3Review").style.display = "block";
+}
+
+/** Enables Confirm & Submit only after an explicit consent choice. */
+function onConsentChange(el) {
+  const btn = document.getElementById("confirmMetaBtn");
+  if (btn) btn.disabled = !el.checked;
+
+  const hint = document.getElementById("consentHint");
+  if (hint && el.checked) {
+    hint.textContent = el.value === "true"
+      ? "Your full PDF will be publicly viewable on the research's detail page."
+      : "Remote viewers will only see the AI-generated IMRaD summary.";
+    hint.classList.add("selected");
+  }
 }
 
 /**
  * Opens the file the student just uploaded (still staged, not yet
  * confirmed) so they can visually verify it's the correct PDF before
  * submitting - separate from checking the AI-extracted metadata text.
- * Wire this to a button inside the #metaModal markup, e.g.:
- *   <button class="btn btn-ghost" onclick="viewUploadedPdf()">📄 View Uploaded PDF</button>
+ * Wired to the "View Uploaded PDF" button inside #step3Review.
  */
 function viewUploadedPdf() {
   if (!currentPreviewId) {
@@ -275,14 +313,22 @@ function viewUploadedPdf() {
 
 
 function cancelMetaConfirm() {
-  document.getElementById("metaModal").style.display = "none";
+  document.getElementById("step3Review").style.display = "none";
+  document.getElementById("step1Pane").style.display = "block";
+
+  /* Restore the step-1 submit button (it was hidden when extraction
+     succeeded), so Cancel always returns to a usable step 1. */
+  const submitBtn = document.getElementById("submitBtn");
+  submitBtn.style.display = "";
+  submitBtn.disabled = false;
+  submitBtn.textContent = "Submit Research →";
 
   currentPreviewId = null;
   setStep(1);
 }
 
 
-/* ── Step 2: student confirms → actually save to DB ─────────────────── */
+/* ── Step 3: student confirms → actually save to DB ─────────────────── */
 
 async function confirmMetaAndSubmit() {
   if (!currentPreviewId) {
@@ -290,20 +336,30 @@ async function confirmMetaAndSubmit() {
     return;
   }
 
+  /* Required consent: no selected radio = no submission. The button is
+     already disabled, but re-check the UI state here too, so the rule
+     can't be bypassed via devtools/Enter key. */
+  const consentInput = document.querySelector('input[name="publicPdfConsent"]:checked');
+  if (!consentInput) {
+    toast("Please choose whether to permit public viewing of your PDF.", "error");
+    return;
+  }
+  const publicPdfConsent = consentInput.value === "true";
+
   const btn = document.getElementById("confirmMetaBtn");
 
   btn.disabled = true;
 
   btn.textContent = "Submitting...";
 
-  const status = document.getElementById("submitStatus");
+  const status = document.getElementById("step3Status");
 
   status.style.display = "block";
 
   status.style.cssText =
     "display:block;padding:12px 14px;border-radius:var(--radius-sm);" +
     "font-size:0.84rem;color:var(--muted);" +
-    "background:var(--bg);box-shadow:var(--neo-inset);";
+    "background:var(--bg);box-shadow:var(--shadow-inset-sm);";
 
   status.textContent =
     "Uploading and indexing document into repository... please don't close or navigate away.";
@@ -313,15 +369,16 @@ async function confirmMetaAndSubmit() {
   try {
     const result = await apiIngestConfirm(
       currentPreviewId,
-      {}
+      {},
+      publicPdfConsent
     );
 
-    document.getElementById("metaModal").style.display = "none";
+    document.getElementById("step1Pane").style.display = "none";
 
     status.style.cssText =
       "display:block;padding:12px 14px;border-radius:var(--radius-sm);" +
       "font-size:0.84rem;color:var(--success);" +
-      "background:#f0fdf4;box-shadow:var(--neo-inset);";
+      "background:#f0fdf4;box-shadow:var(--shadow-inset-sm);";
 
     status.textContent =
       `"${result.metadata?.title || selectedFile.name}" submitted — ` +
@@ -340,7 +397,7 @@ async function confirmMetaAndSubmit() {
     status.style.cssText =
       "display:block;padding:12px 14px;border-radius:var(--radius-sm);" +
       "font-size:0.84rem;color:var(--danger);" +
-      "background:#fef2f2;box-shadow:var(--neo-inset);";
+      "background:#fef2f2;box-shadow:var(--shadow-inset-sm);";
 
     status.textContent =
       `Submission failed: ${e.message}`;

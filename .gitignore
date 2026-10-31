@@ -2,7 +2,28 @@ backend/venv/
 # Environment
 .env
 .env.*
-
 # Python
 __pycache__/
 *.py[cod]
+# Secrets
+.env
+.env.*
+# Virtual env / local data
+venv/
+chroma_db/
+papers/
+# Bulk-ingest artifacts (regenerated per run)
+backend/bulk_ingest_report.csv
+backend/bulk_ingest_cache.json
+PDFs/
+backend/chroma_db/
+backend/abstract_audit.csv
+backend/bandit-report.txt
+backend/bulk_ingest_report.csv
+backend/bulk_ingest_cache.json
+.vscode/
+# Exclude local documentation and diagrams
+/FEATURE_INVENTORY.md
+/docs/backend_function_map.md
+/docs/frontend_function_map.md
+/docs/iPeek_UseCase_Diagram.svg
