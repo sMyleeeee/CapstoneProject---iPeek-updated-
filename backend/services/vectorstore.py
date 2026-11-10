@@ -22,19 +22,29 @@ from config import CHROMA_DIR, CHROMA_COLLECTION, EMBEDDING_MODEL
 logger = logging.getLogger(__name__)
 
 
-def build_source_filter(approved_sources, exclude_source: str | None = None) -> dict:
+def build_source_filter(
+    approved_sources, exclude_source: str | None = None,
+    college: str | None = None, year: int | None = None,
+) -> dict:
     """Chroma metadata filter for retrieval.
 
-    Without exclude_source this is the historical
-    {"source": {"$in": [...]}} filter. With it, an extra $ne clause keeps
-    the current paper's own chunks out of its similarity results — every
-    other analysis (summary, IMRaD, gaps, refine) passes None and still
-    sees the paper's own text.
+    Without extra clauses this is the historical
+    {"source": {"$in": [...]}} filter. exclude_source adds an $ne clause
+    that keeps the current paper's own chunks out of its similarity results
+    — every other analysis (summary, IMRaD, gaps, refine) passes None and
+    still sees the paper's own text. college/year narrow repository Q&A to
+    the browse filters; Chroma stores both as strings.
     """
-    sources_filter = {"source": {"$in": list(approved_sources)}}
-    if not exclude_source:
-        return sources_filter
-    return {"$and": [sources_filter, {"source": {"$ne": exclude_source}}]}
+    clauses = [{"source": {"$in": list(approved_sources)}}]
+    if exclude_source:
+        clauses.append({"source": {"$ne": exclude_source}})
+    if college:
+        clauses.append({"college": college})
+    if year is not None:
+        clauses.append({"year": str(year)})
+    if len(clauses) == 1:
+        return clauses[0]
+    return {"$and": clauses}
 
 
 class VectorStoreService:
@@ -84,13 +94,16 @@ class VectorStoreService:
     async def similarity_search(
         self, query: str, k: int, approved_sources: set, score_threshold: float,
         exclude_source: str | None = None,
+        college: str | None = None, year: int | None = None,
     ) -> list:
         def _search():
             if not approved_sources:
                 return []
             docs_and_scores = self._store.similarity_search_with_relevance_scores(
                 query, k=k,
-                filter=build_source_filter(approved_sources, exclude_source),
+                filter=build_source_filter(
+                    approved_sources, exclude_source, college, year,
+                ),
             )
             return [doc for doc, score in docs_and_scores if score >= score_threshold]
         return await asyncio.to_thread(_search)

@@ -330,15 +330,15 @@ async def bulk_delete_research(
 async def _get_manageable_user(user_id: int, current_user: User, db: AsyncSession) -> User:
     """Shared guard for user-management actions.
 
-    The target must exist, must be a student/faculty account (librarian
-    accounts are never manageable through this UI — no locking out other
-    librarians or yourself), and must not be the acting librarian."""
+    The target must exist and be a student account. Librarian accounts are
+    never manageable through this UI (no locking out other librarians or
+    yourself), and legacy faculty rows are no longer supported."""
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    if user.role == RoleEnum.librarian:
-        raise HTTPException(status_code=403, detail="Librarian accounts cannot be managed here.")
+    if user.role != RoleEnum.student:
+        raise HTTPException(status_code=403, detail="Only student accounts can be managed here.")
     if user.id == current_user.id:
         raise HTTPException(status_code=403, detail="You cannot manage your own account here.")
     return user
@@ -350,11 +350,11 @@ async def manage_users(
     current_user: User = Depends(require_role("librarian")),
     db: AsyncSession = Depends(get_db),
 ):
-    """Lists manageable accounts: students AND faculty (librarians never
-    listed). Deactivated users are hidden by default but stay retrievable
-    via ?include_inactive=true for record lookups. No user rows are ever
-    deleted — deactivation is a flag flip only."""
-    stmt = select(User).where(User.role.in_([RoleEnum.student, RoleEnum.faculty]))
+    """Lists manageable accounts: students only (librarians and legacy
+    faculty rows are never listed). Deactivated users are hidden by default
+    but stay retrievable via ?include_inactive=true for record lookups. No
+    user rows are ever deleted — deactivation is a flag flip only."""
+    stmt = select(User).where(User.role == RoleEnum.student)
     if not include_inactive:
         stmt = stmt.where(User.is_active == True)  # noqa: E712
     stmt = stmt.order_by(User.created_at.desc())
@@ -401,9 +401,9 @@ async def admin_create_user(
     chosen here — a cryptographically random one is generated server-side,
     hashed with the same bcrypt path as normal registrations, and returned
     in plaintext exactly ONCE (this response) for manual hand-off. It is
-    never logged or emailed. Role stays domain-derived: only student/faculty
-    can be created; allowlisted librarian emails are rejected (the single
-    librarian account is configured via env, not this UI)."""
+    never logged or emailed. Role stays domain-derived: only students can be
+    created; allowlisted librarian emails are rejected (librarian accounts
+    are configured via env, not this UI)."""
     try:
         role = determine_role_from_email(payload.email)
     except ValueError as e:

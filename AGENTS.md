@@ -8,15 +8,18 @@ with reindex_chroma.py. Embeddings and reranker run locally (ONNX, FastEmbed). G
 the only LLM. SMTP is used for OTP and generated-password emails.
 
 ## Auth and roles
-- Role is always derived on the server from the email domain. Never trust a client role.
-  @students.isatu.edu.ph = student; @isatu.edu.ph on the LIBRARIAN_EMAILS allowlist =
-  librarian, otherwise faculty. Faculty has the same access as students, EXCEPT the
-  /ai/* routes: faculty is intentionally blocked there (403). Do not "fix" that guard.
+- iPeek has exactly two roles: student and librarian. Role is always derived on the
+  server from the email domain; never trust a client role. @students.isatu.edu.ph =
+  student; @isatu.edu.ph on the LIBRARIAN_EMAILS allowlist = librarian; every other
+  address is rejected at the OTP request (400 "Only student school emails can
+  register"). Never create a faculty user. `faculty` stays in RoleEnum only as a
+  deprecated legacy value (the Postgres enum already has it); a legacy faculty
+  account gets 403 "This account type is no longer supported".
 - Passwords: bcrypt used directly (pinned 4.0.1). Never add passlib.
 - Email is the login identifier and cannot be changed after registration.
-- Registration requires students and faculty to pick a seeded college: an
-  unresolved `department` is a 400, and only the canonical college name is
-  stored. Librarians are exempt (they are not tied to a college).
+- Registration requires students to pick a seeded college: an unresolved
+  `department` is a 400, and only the canonical college name is stored.
+  Librarians are exempt (they are not tied to a college).
 - Password recovery is self-service by email OTP only, which emails a newly generated
   password. There is no admin password reset and no refresh token; JWT lifetime comes
   from ACCESS_TOKEN_EXPIRE_MINUTES in config.py.
@@ -35,7 +38,21 @@ the only LLM. SMTP is used for OTP and generated-password emails.
   migrations against Supabase) without asking first.
 
 ## Scope
-- No Chat-with-AI feature anywhere.
+- Single-turn cited repository Q&A (`POST /search/ask`) is allowed. Multi-turn
+  chat, memory and history stay out of scope.
+- Students never receive the raw PDF: the view-only reader
+  (`/repository/{id}/reader`) serves server-rendered, watermarked JPEG pages,
+  and the raw `/repository/{source_stem}/pdf` route is librarian-only (owner
+  included). Screenshots cannot be prevented; the frontend must disable
+  right-click, drag and print shortcuts and must never embed a PDF URL.
+- The OPAC / Library Viewing Station (kiosk sessions) is out of scope and has
+  been removed from the backend. The `kiosk_sessions` table stays unused in
+  Supabase. Background and a suggested approach live in
+  `docs/recommendations_for_future_researchers.md`.
+- The research detail page is standalone for ONE paper (`GET /repository/{id}`
+  returns metadata, abstract and the reader gate). `/auth/me` returns a
+  `landing` hint (`"ask"` for students, `"dashboard"` for librarians) for the
+  frontend only — it is never used for access control.
 - Minimal diffs. Do not touch unrelated areas. When a task says "investigate first",
   report findings before editing.
 - Frontend design system: cream base, neomorphic raised elements, glass/blur only for
@@ -69,6 +86,7 @@ recreate them (storage keys come from safe_object_key() only).
   frontend/js/api.js before calling or changing an endpoint, and do not invent new ones.
 - Keep the design system unchanged (cream base, neomorphic raised elements, glass blur
   only on floating overlays, navy/yellow/orange palette).
-- Do not reintroduce Chat-with-AI, and do not hardcode secrets, URLs, or test data.
+- Do not reintroduce multi-turn Chat-with-AI, memory or history, and do not
+  hardcode secrets, URLs, or test data.
 
 Stop the backend before running bulk_ingest.py or reindex_chroma.py, and start it again afterward (local Chroma is not safe for two processes).

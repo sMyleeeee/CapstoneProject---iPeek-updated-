@@ -92,9 +92,9 @@ async def register(user_in: UserCreate, db: AsyncSession = Depends(get_db)):
     plaintext is emailed to the verified address exactly once. The
     plaintext is never returned in the response and never stored.
 
-    Students and faculty MUST pick a known college: `department` has to
-    resolve to one of the seeded colleges (GET /auth/colleges) or the
-    request is a 400. Librarians are not tied to a college and are exempt.
+    Students MUST pick a known college: `department` has to resolve to one
+    of the seeded colleges (GET /auth/colleges) or the request is a 400.
+    Librarians are not tied to a college and are exempt.
     """
     try:
         role = determine_role_from_email(user_in.email)
@@ -103,7 +103,7 @@ async def register(user_in: UserCreate, db: AsyncSession = Depends(get_db)):
 
     # Validated BEFORE the OTP is touched, so a bad/missing college never
     # consumes a verified email. The stored value is always the canonical
-    # college NAME — free text is never persisted for students/faculty.
+    # college NAME — free text is never persisted for students.
     if role == RoleEnum.librarian:
         department = normalize_department(user_in.department)
     else:
@@ -140,7 +140,7 @@ async def register(user_in: UserCreate, db: AsyncSession = Depends(get_db)):
         password_hash=hash_password(password),
         fullname=user_in.fullname,
         role=role,
-        # Canonical college name for students/faculty (validated above);
+        # Canonical college name for students (validated above);
         # librarians may keep free text or nothing at all.
         department=department,
     )
@@ -187,6 +187,14 @@ async def login(
             detail="Incorrect username or password",
         )
 
+    # Legacy faculty rows may still exist in the database, but the role is
+    # no longer supported: refuse the login with a clear message.
+    if user.role == RoleEnum.faculty:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This account type is no longer supported",
+        )
+
     if not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -194,8 +202,8 @@ async def login(
         )
 
     # "sid" = per-login session id. Every login (device/browser) gets a
-    # fresh UUID, so the kiosk lock can be scoped to ONE session and can
-    # never leak into another session of the same user/role.
+    # fresh UUID. Kept in the token for backward compatibility with clients
+    # that already expect the claim; it is no longer used for session locking.
     access_token = create_access_token(
         data={"sub": str(user.id), "role": user.role.value, "sid": uuid4().hex}
     )
@@ -210,6 +218,9 @@ def _with_college(user: User) -> UserOut:
     return UserOut.model_validate(user).model_copy(update={
         "college_id": resolve_college(department),
         "college_code": resolve_college_code(department),
+        # Frontend hint only: students land on the ask page, librarians on
+        # the dashboard. The server still decides access per route.
+        "landing": "dashboard" if user.role == RoleEnum.librarian else "ask",
     })
 
 

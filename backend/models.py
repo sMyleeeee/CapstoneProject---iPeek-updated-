@@ -11,6 +11,8 @@ from database import Base
 
 class RoleEnum(str, enum.Enum):
     student = "student"
+    # DEPRECATED legacy value: the Postgres enum type already contains it
+    # and old rows may still hold it. Never assign this role again.
     faculty = "faculty"
     librarian = "librarian"
 
@@ -89,7 +91,6 @@ class Research(Base):
     status = Column(Enum(StatusEnum), default=StatusEnum.pending, nullable=False)
     # Author's submission-time choice for REMOTE visibility of the full PDF.
     # No server-side default: always set explicitly by confirm_upload.
-    # Does NOT affect Library Kiosk (in-person) viewing.
     public_pdf_consent = Column(Boolean, nullable=False)
 
     student_id = Column(Integer, ForeignKey("users.id"), nullable=False)
@@ -166,24 +167,3 @@ class AIAnalysis(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     research = relationship("Research", back_populates="ai_analysis")
-
-
-class KioskSession(Base):
-    """
-    Session-scoped Library Viewing Station state, keyed by the JWT's
-    per-login "sid" claim — NOT by user id and NOT by role.
-
-    Locking one sid can only ever affect that one login session: a
-    librarian's own session on their own device has a different sid, so
-    it is structurally unreachable from here.
-    """
-    __tablename__ = "kiosk_sessions"
-
-    sid = Column(String(64), primary_key=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    is_kiosk = Column(Boolean, default=False, nullable=False)
-    locked = Column(Boolean, default=False, nullable=False)
-    locked_by = Column(Integer, ForeignKey("users.id"), nullable=True)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-    user = relationship("User", foreign_keys=[user_id])

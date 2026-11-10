@@ -1,3 +1,6 @@
+import threading
+import time
+from collections import deque
 from typing import List, Optional
 from pathlib import Path
 
@@ -5,23 +8,110 @@ import asyncio
 
 import httpx
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, Response
+from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from config import MAX_UPLOAD_SIZE, STAGING_DIR
+from config import (
+    ENFORCE_PDF_CONSENT, MAX_UPLOAD_SIZE, PDF_READER_RATE_LIMIT, STAGING_DIR,
+)
 from database import get_db
-from dependencies import get_current_sid, is_kiosk_session, require_role
+from dependencies import require_role
 from models import College, Feedback, Research, RoleEnum, StatusEnum, User
 from schemas import (
-    FeedbackOut, RepositoryFiltersOut, ResearchOut, UploadConfirmIn,
-    UploadPreviewOut,
+    CollegeRefOut, FeedbackOut, ReaderInfoOut, RepositoryFiltersOut,
+    ResearchDetailOut, ResearchOut, UploadConfirmIn, UploadPreviewOut,
 )
 from services.colleges import resolve_college
 from services.ingestor import ingestor
+from services.pdf_reader import pdf_reader_service
 from services.storage import storage_service
-from fastapi.responses import FileResponse
 
 router = APIRouter(prefix="/repository", tags=["Repository"])
+
+# ── View-only reader helpers ────────────────────────────────────────────────
+# Per-user sliding window: pages rendered per minute. Kept in-process
+# (single local backend) so one student cannot exhaust the library's CPU.
+_PAGE_WINDOW_SECONDS = 60
+_page_hits: "dict[int, deque[float]]" = {}
+_page_lock = threading.Lock()
+
+_ACCESS_MESSAGES = {
+    "not_approved": "This paper is not approved for public viewing.",
+    "not_consented": "The author has not allowed public viewing of this paper.",
+}
+
+
+def _pdf_view_access(research: Research, current_user: User) -> tuple[bool, Optional[str]]:
+    """Owner and librarians always; everyone else only an APPROVED paper
+    whose author allowed public viewing (unless the consent gate is off)."""
+    if current_user.role == RoleEnum.librarian:
+        return True, None
+    if research.student_id == current_user.id:
+        return True, None
+    if research.status != StatusEnum.approved:
+        return False, "not_approved"
+    if ENFORCE_PDF_CONSENT and not research.public_pdf_consent:
+        return False, "not_consented"
+    return True, None
+
+
+def _pdf_forbidden(reason: str) -> JSONResponse:
+    return JSONResponse(
+        status_code=403,
+        content={"detail": _ACCESS_MESSAGES[reason], "reason": reason},
+    )
+
+
+def _page_rate_limited(user_id: int) -> bool:
+    limit = PDF_READER_RATE_LIMIT
+    if limit <= 0:
+        return False
+    now = time.monotonic()
+    cutoff = now - _PAGE_WINDOW_SECONDS
+    with _page_lock:
+        window = _page_hits.setdefault(user_id, deque())
+        while window and window[0] <= cutoff:
+            window.popleft()
+        if len(window) >= limit:
+            return True
+        window.append(now)
+        return False
+
+
+async def _reader_page_count(research: Research) -> Optional[int]:
+    info = await pdf_reader_service.get_info(research.filepath, research.updated_at)
+    return info["page_count"] if info else None
+
+
+async def _research_detail_out(
+    research: Research, current_user: User, db: AsyncSession,
+) -> ResearchDetailOut:
+    allowed, reason = _pdf_view_access(research, current_user)
+    page_count = await _reader_page_count(research) if allowed else None
+
+    college = None
+    if research.college_id is not None:
+        row = await db.execute(select(College).where(College.id == research.college_id))
+        c = row.scalar_one_or_none()
+        if c:
+            college = CollegeRefOut(id=c.id, code=c.code, name=c.name)
+
+    return ResearchDetailOut(
+        **ResearchOut.model_validate(research).model_dump(),
+        college=college,
+        can_view_pdf=allowed,
+        pdf_block_reason=reason,
+        page_count=page_count,
+    )
+
+
+async def _load_research(research_id: int, db: AsyncSession) -> Research:
+    result = await db.execute(select(Research).where(Research.id == research_id))
+    research = result.scalar_one_or_none()
+    if not research:
+        raise HTTPException(status_code=404, detail="Research not found")
+    return research
 
 
 async def _stream_private_pdf(object_key: str) -> Response:
@@ -49,7 +139,7 @@ async def _stream_private_pdf(object_key: str) -> Response:
 @router.get("/upload/preview/{preview_id}/pdf")
 async def get_preview_pdf(
     preview_id: str,
-    current_user: User = Depends(require_role("student", "faculty", "librarian")),
+    current_user: User = Depends(require_role("student", "librarian")),
 ):
     """
     Serves the STAGED file for a not-yet-confirmed upload, so the
@@ -69,36 +159,29 @@ async def get_preview_pdf(
 @router.get("/{source_stem}/pdf")
 async def get_pdf(
     source_stem: str,
-    current_user: User = Depends(require_role("student", "faculty", "librarian")),
-    sid: str | None = Depends(get_current_sid),
+    current_user: User = Depends(require_role("student", "librarian")),
     db: AsyncSession = Depends(get_db),
 ):
+    """Raw PDF bytes for librarian review only.
+
+    Students must never receive the stored file (the adviser's decision is
+    view-only). They use /repository/{id}/reader, which serves watermarked
+    page images instead. Owners are no exception: My Submissions uses the
+    same reader.
+    """
+    if current_user.role != RoleEnum.librarian:
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "Raw PDF downloads are librarian-only. "
+                "Use the view-only reader instead."
+            ),
+        )
+
     result = await db.execute(select(Research).where(Research.source_stem == source_stem))
     research = result.scalar_one_or_none()
     if not research:
         raise HTTPException(status_code=404, detail="Document not available for viewing.")
-
-    is_owner = research.student_id == current_user.id
-    is_librarian = current_user.role.value == "librarian"
-    is_approved = research.status == StatusEnum.approved
-
-    # Privacy rule: full PDFs of APPROVED research are only served to
-    #  - Library Viewing Station sessions (kiosk-activated sid),
-    #  - librarians (review workflow needs every status),
-    #  - the uploader (their own paper, any status — My Submissions page),
-    #  - remote viewers, but ONLY if the author gave submission-time
-    #    consent (public_pdf_consent == True).
-    # Remote viewers without consent get the IMRaD summary on the detail
-    # page instead (POST /ai/{id}/imrad). The kiosk path is unaffected by
-    # consent — in-person supervised viewing always sees the full PDF.
-    remote_ok = is_approved and (
-        research.public_pdf_consent or await is_kiosk_session(sid, db)
-    )
-    if not (is_owner or is_librarian or remote_ok):
-        raise HTTPException(
-            status_code=403,
-            detail="Full document viewing is only available at the Library Viewing Station.",
-        )
 
     # filepath is authoritative: pending/{stem}.pdf for non-approved,
     # public/{stem}.pdf for approved (approval MOVES the object and updates
@@ -113,7 +196,7 @@ async def upload_preview(
     year: str = Form(""),
     members: str = Form(""),
     abstract: str = Form(""),
-    current_user: User = Depends(require_role("student", "faculty", "librarian")),
+    current_user: User = Depends(require_role("student", "librarian")),
     db: AsyncSession = Depends(get_db),
 ):
     try:
@@ -128,7 +211,7 @@ async def upload_preview(
 @router.post("/upload/confirm")
 async def upload_confirm(
     payload: UploadConfirmIn,
-    current_user: User = Depends(require_role("student", "faculty", "librarian")),
+    current_user: User = Depends(require_role("student", "librarian")),
     db: AsyncSession = Depends(get_db),
 ):
     try:
@@ -142,7 +225,7 @@ async def upload_confirm(
 
 @router.get("/filters", response_model=RepositoryFiltersOut)
 async def repository_filters(
-    current_user: User = Depends(require_role("student", "faculty", "librarian")),
+    current_user: User = Depends(require_role("student", "librarian")),
     db: AsyncSession = Depends(get_db),
 ):
     """Everything the browse page needs to build its filter controls in one
@@ -175,9 +258,9 @@ async def repository_filters(
         for c in college_rows
     ]
 
-    # Librarians are not tied to a college; a student/faculty member's own
-    # department resolves to a college only when the text matches a
-    # canonical name (unmatched free text -> null, never an error).
+    # Librarians are not tied to a college; a student's own department
+    # resolves to a college only when the text matches a canonical name
+    # (unmatched free text -> null, never an error).
     department = None if current_user.role == RoleEnum.librarian else current_user.department
     own_id = resolve_college(department)
     own_college = next((c for c in colleges if c["id"] == own_id), None)
@@ -194,7 +277,7 @@ async def repository_filters(
 async def browse_repository(
     college_id: Optional[int] = None,
     year: Optional[int] = None,
-    current_user: User = Depends(require_role("student", "faculty", "librarian")),
+    current_user: User = Depends(require_role("student", "librarian")),
     db: AsyncSession = Depends(get_db),
 ):
     """Approved papers only, optionally narrowed by college and/or year
@@ -211,7 +294,7 @@ async def browse_repository(
 @router.get("/search", response_model=List[ResearchOut])
 async def search_research(
     q: Optional[str] = None,
-    current_user: User = Depends(require_role("student", "faculty", "librarian")),
+    current_user: User = Depends(require_role("student", "librarian")),
     db: AsyncSession = Depends(get_db),
 ):
     query = select(Research).where(Research.status == StatusEnum.approved)
@@ -221,22 +304,22 @@ async def search_research(
     return result.scalars().all()
 
 
-@router.get("/{source_stem}/detail", response_model=ResearchOut)
+@router.get("/{source_stem}/detail", response_model=ResearchDetailOut)
 async def get_research_detail(
     source_stem: str,
-    current_user: User = Depends(require_role("student", "faculty", "librarian")),
+    current_user: User = Depends(require_role("student", "librarian")),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(select(Research).where(Research.source_stem == source_stem))
     research = result.scalar_one_or_none()
     if not research:
         raise HTTPException(status_code=404, detail="Research not found")
-    return research
+    return await _research_detail_out(research, current_user, db)
 
 
 @router.get("/my-uploads", response_model=List[ResearchOut])
 async def my_uploads(
-    current_user: User = Depends(require_role("student", "faculty", "librarian")),
+    current_user: User = Depends(require_role("student", "librarian")),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(select(Research).where(Research.student_id == current_user.id))
@@ -246,7 +329,7 @@ async def my_uploads(
 @router.get("/{research_id}/feedback", response_model=List[FeedbackOut])
 async def check_feedback(
     research_id: int,
-    current_user: User = Depends(require_role("student", "faculty", "librarian")),
+    current_user: User = Depends(require_role("student", "librarian")),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
@@ -258,3 +341,77 @@ async def check_feedback(
 
     fb_result = await db.execute(select(Feedback).where(Feedback.research_id == research_id))
     return fb_result.scalars().all()
+
+
+# ── View-only PDF reader ───────────────────────────────────────────────────
+# IMPORTANT: these routes never return `research.filepath`, a signed URL or
+# any storage identifier — only dimensions, a page count and JPEG bytes.
+
+@router.get("/{research_id}", response_model=ResearchDetailOut)
+async def get_research_by_id(
+    research_id: int,
+    current_user: User = Depends(require_role("student", "librarian")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Detail by numeric id, including the reader gate."""
+    research = await _load_research(research_id, db)
+    return await _research_detail_out(research, current_user, db)
+
+
+@router.get("/{research_id}/reader", response_model=ReaderInfoOut)
+async def get_reader_info(
+    research_id: int,
+    current_user: User = Depends(require_role("student", "librarian")),
+    db: AsyncSession = Depends(get_db),
+):
+    research = await _load_research(research_id, db)
+    allowed, reason = _pdf_view_access(research, current_user)
+    if not allowed:
+        return _pdf_forbidden(reason)
+
+    info = await pdf_reader_service.get_info(research.filepath, research.updated_at)
+    if not info:
+        raise HTTPException(status_code=404, detail="Document not available for viewing.")
+    return ReaderInfoOut(**info)
+
+
+@router.get("/{research_id}/reader/pages/{page_number}")
+async def get_reader_page(
+    research_id: int,
+    page_number: int,
+    current_user: User = Depends(require_role("student", "librarian")),
+    db: AsyncSession = Depends(get_db),
+):
+    research = await _load_research(research_id, db)
+    allowed, reason = _pdf_view_access(research, current_user)
+    if not allowed:
+        return _pdf_forbidden(reason)
+
+    if _page_rate_limited(current_user.id):
+        raise HTTPException(
+            status_code=429,
+            detail="Too many page requests. Please slow down.",
+            headers={"Retry-After": str(_PAGE_WINDOW_SECONDS)},
+        )
+
+    info = await pdf_reader_service.get_info(research.filepath, research.updated_at)
+    if not info:
+        raise HTTPException(status_code=404, detail="Document not available for viewing.")
+    if page_number < 1 or page_number > info["page_count"]:
+        raise HTTPException(status_code=404, detail="Page out of range.")
+
+    jpeg = await pdf_reader_service.render_page(
+        research.filepath, page_number, current_user.email, research.updated_at
+    )
+    if not jpeg:
+        raise HTTPException(status_code=404, detail="Page not available.")
+
+    return Response(
+        content=jpeg,
+        media_type="image/jpeg",
+        headers={
+            "Cache-Control": "no-store",
+            "Content-Disposition": f'inline; filename="page-{page_number}.jpg"',
+            "X-Content-Type-Options": "nosniff",
+        },
+    )

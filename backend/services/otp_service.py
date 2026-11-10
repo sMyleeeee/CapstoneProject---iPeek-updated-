@@ -40,27 +40,23 @@ def determine_role_from_email(email: str) -> RoleEnum:
     @students.isatu.edu.ph -> student
     @isatu.edu.ph          -> librarian, IF the address is on the
                                LIBRARIAN_EMAILS allowlist (config.py /
-                               .env) — otherwise -> faculty.
+                               .env) — otherwise REJECTED.
 
-    The allowlist step exists because the domain alone can't distinguish
-    an actual librarian from a teacher/adviser; both share
-    @isatu.edu.ph. Faculty accounts currently have the same route
-    access as students (see research_routes.py / ai_routes.py) — no
-    admin/review capability, by design.
+    iPeek has exactly two roles: student and librarian. The allowlist
+    step exists because the domain alone can't distinguish an actual
+    librarian from other staff; anyone not on it is refused at the OTP
+    request (400) instead of being given a faculty account.
 
-    Raises ValueError for any other domain. Called both before sending
-    an OTP (so we never email a non-institutional address) and again at
+    Raises ValueError for any other address/domain. Called both before
+    sending an OTP (so we never email an ineligible address) and again at
     registration (so the role can never be spoofed by the client).
     """
     email_lower = email.strip().lower()
     if email_lower.endswith(STUDENT_EMAIL_DOMAIN):
         return RoleEnum.student
-    if email_lower.endswith(STAFF_EMAIL_DOMAIN):
-        return RoleEnum.librarian if email_lower in LIBRARIAN_EMAILS else RoleEnum.faculty
-    raise ValueError(
-        f"Only ISAT-U institutional emails are accepted "
-        f"({STUDENT_EMAIL_DOMAIN} for students, {STAFF_EMAIL_DOMAIN} for faculty/librarians)."
-    )
+    if email_lower.endswith(STAFF_EMAIL_DOMAIN) and email_lower in LIBRARIAN_EMAILS:
+        return RoleEnum.librarian
+    raise ValueError("Only student school emails can register")
 
 
 def _hash_code(code: str) -> str:

@@ -10,7 +10,7 @@ Three consumers, deliberately kept separate:
    (None when unknown/unmatched: college_id stays NULL, never blocks).
 
 2. REGISTRATION — resolve_college_name(text) must match a canonical college
-   for students/faculty (400 otherwise; librarians are exempt).
+   for students (400 otherwise; librarians are exempt).
    GET /auth/colleges exposes this registry to the sign-up dropdown.
 
 3. BULK ingest (bulk_ingest.py) — the FOLDER decides the college; the LLM's

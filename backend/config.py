@@ -54,6 +54,32 @@ PREVIEW_MAX_AGE_SECONDS  = 3600
 LOGIN_RATE_LIMIT = "10/minute"
 
 # ─────────────────────────────────────────────────────────────────────────
+# Single-turn cited repository Q&A (POST /search/ask).
+# SEARCH_MIN_SCORE is provisional: the relevance floor applied to Cosine
+# similarity before re-ranking. SEARCH_TOP_K chunks are retrieved, the best
+# SEARCH_RERANK_TOP_N are re-ranked, then grouped into per-paper citations.
+# ─────────────────────────────────────────────────────────────────────────
+SEARCH_MIN_SCORE = float(os.environ.get("SEARCH_MIN_SCORE", "0.35"))
+SEARCH_TOP_K = int(os.environ.get("SEARCH_TOP_K", "12"))
+SEARCH_RERANK_TOP_N = int(os.environ.get("SEARCH_RERANK_TOP_N", "6"))
+SEARCH_CACHE_TTL_SECONDS = int(os.environ.get("SEARCH_CACHE_TTL_SECONDS", "600"))
+SEARCH_RATE_LIMIT_PER_MINUTE = int(os.environ.get("SEARCH_RATE_LIMIT_PER_MINUTE", "10"))
+SEARCH_RATE_LIMIT_PER_DAY = int(os.environ.get("SEARCH_RATE_LIMIT_PER_DAY", "60"))
+
+# ─────────────────────────────────────────────────────────────────────────
+# View-only PDF reader (server-rendered, watermarked page images).
+# Students never receive the raw PDF; librarian review still uses the
+# existing raw /pdf route.
+# ─────────────────────────────────────────────────────────────────────────
+PDF_READER_DPI = int(os.environ.get("PDF_READER_DPI", "110"))
+PDF_READER_CACHE_SIZE = int(os.environ.get("PDF_READER_CACHE_SIZE", "8"))
+PDF_READER_RATE_LIMIT = int(os.environ.get("PDF_READER_RATE_LIMIT", "120"))
+ENFORCE_PDF_CONSENT = (
+    os.environ.get("ENFORCE_PDF_CONSENT", "true").strip().lower()
+    not in {"0", "false", "no", "off"}
+)
+
+# ─────────────────────────────────────────────────────────────────────────
 # Access-token lifetime (minutes). No refresh tokens: when a token expires
 # the client must log in again (401 "Session expired. Please log in again.").
 # ─────────────────────────────────────────────────────────────────────────
@@ -75,15 +101,16 @@ OTP_MAX_ATTEMPTS = 5
 OTP_RESEND_COOLDOWN_SECONDS = 60
 
 # Institutional email domains — the actual role-assignment mechanism.
+# iPeek has exactly two roles: student and librarian.
 # @students.isatu.edu.ph -> student
-# @isatu.edu.ph          -> librarian (if on LIBRARIAN_EMAILS) else faculty
+# @isatu.edu.ph          -> librarian (if on LIBRARIAN_EMAILS), else rejected
 STUDENT_EMAIL_DOMAIN = "@students.isatu.edu.ph"
 STAFF_EMAIL_DOMAIN   = "@isatu.edu.ph"
 
 # Comma-separated list of actual librarian emails, set in .env.
-# Any @isatu.edu.ph account NOT on this list registers as "faculty"
-# instead — this is what distinguishes librarian staff from teachers/
-# advisers, since the domain alone is shared by both.
+# Any @isatu.edu.ph account NOT on this list is rejected at the OTP
+# request — this is what distinguishes librarian staff from everyone
+# else, since the domain alone is shared by all staff.
 LIBRARIAN_EMAILS = {
     e.strip().lower()
     for e in os.environ.get("LIBRARIAN_EMAILS", "").split(",")

@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, EmailStr, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 from models import RoleEnum, StatusEnum
 
@@ -47,6 +47,9 @@ class UserOut(BaseModel):
     # text that matches no canonical college). Filled in by /auth/me.
     college_id: Optional[int] = None
     college_code: Optional[str] = None
+    # Frontend hint only, filled in by /auth/me: students land on the
+    # repository prompt ("ask"), librarians on their dashboard.
+    landing: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -111,6 +114,13 @@ class PasswordResetConfirm(_EmailNormalizedBase):
 
 # ---------- Research ----------
 
+class CollegeRefOut(BaseModel):
+    """Just enough to identify a college (no counts)."""
+    id: int
+    code: str
+    name: str
+
+
 class ResearchOut(BaseModel):
     id: int
     title: str
@@ -130,19 +140,33 @@ class ResearchOut(BaseModel):
         from_attributes = True
 
 
+class ResearchDetailOut(ResearchOut):
+    """Single-paper detail plus the reader gate the frontend needs.
+
+    `page_count` is only filled when the caller may use the view-only
+    reader. `college` is the resolved {id, code, name} when the row has a
+    college_id, null otherwise. No storage key or signed URL is ever part of
+    this shape.
+    """
+    college: Optional[CollegeRefOut] = None
+    can_view_pdf: bool
+    pdf_block_reason: Optional[str] = None
+    page_count: Optional[int] = None
+
+
+class ReaderInfoOut(BaseModel):
+    page_count: int
+    width: int
+    height: int
+    watermark: bool = True
+
+
 class ValidateResearch(BaseModel):
     approve: bool
     feedback_message: Optional[str] = None
 
 
 # ---------- Repository browse filters ----------
-
-class CollegeRefOut(BaseModel):
-    """Just enough to identify a college (no counts)."""
-    id: int
-    code: str
-    name: str
-
 
 class CollegeFilterOut(CollegeRefOut):
     """One canonical college plus how many APPROVED papers it holds.
@@ -266,3 +290,37 @@ class AnalysisSource(BaseModel):
 class AnalysisOut(BaseModel):
     result: str
     sources: list[AnalysisSource]
+
+
+# ---------- Repository Q&A (single-turn, cited) ----------
+
+class AskIn(BaseModel):
+    query: str = Field(min_length=1, max_length=500)
+    college_id: Optional[int] = None
+    year: Optional[int] = None
+
+    @field_validator("query")
+    @classmethod
+    def _not_blank(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("query must not be blank")
+        return v
+
+
+class AskCitationOut(BaseModel):
+    n: int
+    research_id: int
+    title: str
+    authors: str
+    year: Optional[int] = None
+    college: str
+    pages: list[int]
+    snippet: str
+    score: float
+
+
+class AskOut(BaseModel):
+    answer: str
+    found: bool
+    citations: list[AskCitationOut]
