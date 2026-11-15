@@ -20,14 +20,11 @@ async def ask_repository(
     current_user: User = Depends(require_role("student", "librarian")),
     db: AsyncSession = Depends(get_db),
 ):
-    """Single-turn, cited question answering over the whole repository.
-
-    There is no history and no memory: each request is independent.
-    """
+    """Cited repository answers with bounded, request-local topic context."""
     try:
         return await repository_qa_service.ask(
             payload.query, payload.college_id, payload.year,
-            current_user.id, db,
+            current_user.id, db, context=[turn.model_dump() for turn in payload.context],
         )
     except RepositoryQARateLimited:
         raise HTTPException(

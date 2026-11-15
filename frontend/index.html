@@ -115,7 +115,9 @@
         <label class="login-label" for="regFullname">Full Name</label>
         <input class="login-input" id="regFullname" type="text" placeholder="Juan Dela Cruz">
         <label class="login-label" for="regEmail">Institutional Email</label>
-        <input class="login-input" id="regEmail" type="email" placeholder="you@students.isatu.edu.ph or you@isatu.edu.ph">
+        <input class="login-input" id="regEmail" type="email" aria-describedby="regEmailHelp regEmailErr" placeholder="you@students.isatu.edu.ph">
+        <p id="regEmailHelp" class="text-sm">Use your student school email. Librarian registration is available only to addresses approved by the library.</p>
+        <div id="regEmailErr" class="err-box" role="status"></div>
         <label class="login-label" for="regDept">Department / College</label>
         <select aria-describedby="collegeStatus" class="login-input" id="regDept" required disabled><option value="" disabled selected>Loading colleges...</option></select><p id="collegeStatus" class="form-status" role="status"></p><button type="button" class="btn btn-ghost btn-sm" onclick="loadColleges()">Reload colleges</button>
         <p style="font-size:0.8rem; color:var(--muted, #666); margin:10px 0 14px;">

@@ -1,6 +1,6 @@
 /* One mounted detail controller, shared by Browse and direct detail entries. */
 (() => {
-  const browseMounted = !!document.getElementById('grid');
+  const browseMounted = !!document.getElementById('grid') || !!document.getElementById('askMain');
   const mountId = crypto.randomUUID();
   let dialog, templatePromise, revision = 0, source = null, closeTimer;
   let originCard = null, scrollY = 0, savedBodyStyle = '', background = [];
@@ -67,7 +67,7 @@
   }
   function requestClose() {
     if (browseMounted && history.state?.detailMount === mountId) history.go(-history.state.detailDepth);
-    else location.assign('browse.html');
+    else location.assign('ask.html');
   }
   function hide() {
     ++revision;

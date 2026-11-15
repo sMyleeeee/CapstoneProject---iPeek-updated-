@@ -73,10 +73,15 @@ body {
 }
 
 a    { text-decoration: none; color: inherit; }
-:is(a[href], button, input, select, textarea, summary, [tabindex], [contenteditable="true"]):focus-visible {
-  outline: 3px solid var(--primary);
-  outline-offset: 3px;
+/* One focus indicator across pages; outlines do not affect layout. */
+:focus-visible {
+  outline: 1px solid var(--primary);
+  outline-offset: 2px;
 }
+/* Keep focus crisp even on controls whose tactile states use transition: all. */
+:root :focus-visible { transition-property: color, background-color, border-color, box-shadow, transform, opacity; }
+/* A flat cream backing keeps the navy line legible over dark/photo surfaces. */
+:is(.mobile-welcome, .hero) :focus-visible { box-shadow: 0 0 0 3px var(--bg); }
 button, input, textarea, select { font-family: inherit; }
 /* Cursor semantics follow the element's actual interaction, never page loading. */
 a[href], button, select, summary, [role="button"], [role="tab"] { cursor: pointer; }
@@ -156,7 +161,10 @@ body.nav-ready > :is(.navbar, .mobile-header, .bottom-tab-bar) {
   flex-shrink: 0;
 }
 
-.nav-links { display: flex; gap: 4px; flex: 1; }
+/* Ask adds a destination for both roles. Keep the pill track scrollable on
+   narrower desktops instead of letting it widen the entire document. */
+/* Reserve outline paint space inside the scroller without moving the links. */
+.nav-links { display: flex; gap: 4px; flex: 1; min-width: 0; overflow-x: auto; padding: 3px; margin: -3px; }
 
 /* Nav track wraps the pill list — subtle bg on flat bar */
 .nav-track {
@@ -250,7 +258,6 @@ body.nav-ready > :is(.navbar, .mobile-header, .bottom-tab-bar) {
 }
 .action-icon-btn:hover:not(:disabled) { background: #fef2f2; }
 .action-icon-btn:active:not(:disabled) { background: #fecaca; }
-.action-icon-btn:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
 .action-icon-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 .action-icon-btn .ui-icon { width: 20px; height: 20px; color: inherit; pointer-events: none; }
 .action-icon-btn::after {
@@ -645,10 +652,6 @@ body.nav-ready > :is(.navbar, .mobile-header, .bottom-tab-bar) {
   transition: border-color 0.18s, box-shadow 0.18s;
 }
 
-.form-input:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(245,197,24,0.2);
-}
 
 .form-input::placeholder { color: #b0b7c3; }
 textarea.form-input      { resize: vertical; min-height: 80px; }
@@ -667,14 +670,15 @@ select.form-input        { cursor: pointer; }
   transition: box-shadow 0.2s, border-color 0.2s;
 }
 
-.search-wrap:focus-within {
-  border-color: var(--accent);
-  box-shadow: var(--shadow), 0 0 0 2px rgba(245,197,24,0.15);
+/* The wrapper replaces the input outline only while that input has focus. */
+.search-wrap:has(input:focus-visible) {
+  outline: 1px solid var(--primary);
+  outline-offset: 2px;
 }
+.search-wrap:has(input:focus-visible) input:focus-visible { outline: none; }
 
 .search-wrap input {
   border: none;
-  outline: none;
   font-size: 0.92rem;
   width: 100%;
   background: transparent;
@@ -715,12 +719,6 @@ select.form-input        { cursor: pointer; }
   box-shadow: 0 2px 5px rgba(30, 48, 80, 0.10), inset 0 1px 0 rgba(255,255,255,0.8);
 }
 .browse-year-select select:hover:not(:disabled) { border-color: var(--primary); background: var(--bg); }
-.browse-year-select select:focus-visible {
-  outline: 2px solid var(--primary);
-  outline-offset: 2px;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px var(--accent);
-}
 .browse-year-select .ui-icon { position: absolute; right: 14px; top: 50%; transform: translateY(-50%) rotate(90deg); pointer-events: none; color: var(--text); }
 
 /* Reset navigation stays separate from the active primary action in either step. */
@@ -737,7 +735,6 @@ select.form-input        { cursor: pointer; }
   transition: background-color 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
 }
 #resetPanel .reset-back:hover { background: var(--bg); border-color: var(--primary); box-shadow: var(--shadow); }
-#resetPanel .reset-back:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; box-shadow: 0 0 0 2px var(--accent); }
 #resetPanel .reset-back:active { background: rgba(245,197,24,0.18); box-shadow: var(--shadow-inset-sm); transform: none; }
 
 .year-pill {
@@ -1086,7 +1083,6 @@ select.form-input        { cursor: pointer; }
   text-align: left;
   overflow-wrap: anywhere;
 }
-.sub-item-open:focus-visible { outline: 2px solid var(--primary); outline-offset: 4px; border-radius: 4px; }
 
 .sub-item-title  { font-weight: 600; font-size: 0.88rem; margin-bottom: 4px; line-height: 1.4; }
 .sub-item-meta   { font-size: 0.74rem; color: var(--muted); margin-bottom: 6px; }
@@ -1916,7 +1912,6 @@ button.drop-zone > span { display: block; }
   box-shadow: var(--shadow-inset-sm);
   transition: border-color 0.18s, box-shadow 0.18s;
 }
-.login-input:focus { border-color: var(--accent); box-shadow: var(--shadow-inset-sm), 0 0 0 2px rgba(245,197,24,0.2); }
 .login-input::placeholder { color: #8a7c68; letter-spacing: 0.01em; }
 
 .login-input-option {
@@ -2501,7 +2496,6 @@ body.page-fade-in > :is(.main, .layout, .layout-two, .layout-review, .upload-wra
 
 /* ── User management (users.html) ─────────────────────────── */
 .badge-student  { background: rgba(42,74,127,0.12);  color: var(--primary); }
-.badge-faculty  { background: rgba(212,168,0,0.16);  color: var(--accent-dk); }
 .badge-active   { background: rgba(22,163,74,0.14);  color: var(--success); }
 .badge-inactive { background: rgba(0,0,0,0.06);      color: var(--muted); }
 

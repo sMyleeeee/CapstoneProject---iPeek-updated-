@@ -23,7 +23,7 @@ async function initPage() {
   try {
     const me = await apiMe();
     if (me.role !== "librarian") {
-      window.location.replace("browse.html"); return;
+      window.location.replace(landingPage(me)); return;
     }
     currentUserRole = me.role;
     applyNav(me.role);

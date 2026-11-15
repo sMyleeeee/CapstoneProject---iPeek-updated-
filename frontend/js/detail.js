@@ -6,6 +6,7 @@ let researchId = null;
 let activePaper = null;
 let readerView = "paper";
 let readerEventsBound = false;
+let pageReader = null;
 // Reopening a paper while its analysis is pending shares the existing request.
 // Settled results remain the server cache's responsibility.
 const pendingAnalyses = new Map();
@@ -87,7 +88,7 @@ function renderRelated(data, refined = false) {
     ? "Sources from the latest similarity refinement, in returned order. Up to five unique papers."
     : "Sources from the opening similarity analysis, in returned order. Up to five unique papers.";
   const sources = distinctSources((Array.isArray(data.sources) ? data.sources : [])
-    .filter(source => typeof source?.source_stem === "string" && source.source_stem.trim()));
+    .filter(source => Number.isInteger(source?.research_id) && source.research_id > 0));
   if (!sources.length) {
     box.appendChild(element("p", "insight-empty", "No related studies returned"));
     return;
@@ -96,7 +97,7 @@ function renderRelated(data, refined = false) {
     const card = element("article", "related-card");
     const heading = element("h3");
     const link = element("a", "", readable(source.title) || "Untitled study");
-    link.href = `detail.html?id=${encodeURIComponent(source.source_stem)}`;
+    link.href = `detail.html?id=${encodeURIComponent(source.research_id)}`;
     heading.appendChild(link);
     card.append(heading, element("p", "insight-note", [readable(source.authors) || "Authors unavailable", readable(source.year) || "Year unavailable"].join(" · ")));
     const abstract = readable(source.abstract);
@@ -250,12 +251,8 @@ function renderPaperInfo(paper) {
   byId("paperTitle").textContent = paper.title || paper.source || "Untitled";
   byId("paperMeta").textContent = readable(paper.authors) || "Authors not provided.";
   byId("metaChips").replaceChildren();
-  [paper.department, paper.year, paper.status].map(readable).filter(Boolean).forEach(label => byId("metaChips").appendChild(element("span", "meta-chip", label)));
+  [paper.college_ref?.name || paper.department, paper.year, paper.status].map(readable).filter(Boolean).forEach(label => byId("metaChips").appendChild(element("span", "meta-chip", label)));
   byId("abstractText").textContent = paper.abstract || "No abstract provided.";
-}
-function readFullVersion() {
-  if (!paperData?.public_pdf_consent || !paperData.source) return;
-  viewPdfInNewTab(apiPdfUrl(paperData.source));
 }
 function syncReaderViews() {
   const mobile = window.matchMedia("(max-width: 768px)").matches;
@@ -286,10 +283,12 @@ function bindReaderEvents() {
   }
   window.matchMedia("(max-width: 768px)").addEventListener("change", syncReaderViews);
   byId("refineForm").addEventListener("submit", refineAnalysis);
-  byId("readPdfBtn").addEventListener("click", readFullVersion);
+
 }
 async function initPage() {
   bindReaderEvents();
+  pageReader?.destroy();
+  pageReader = null;
   const context = { source: currentSource(), id: null, jobs: {}, refining: false, relatedRevision: 0 };
   activePaper = context;
   canUseAI = false; paperData = null; researchId = null;
@@ -303,7 +302,7 @@ async function initPage() {
   byId("refineBtn").disabled = false;
   byId("refineBtn").textContent = "Refine";
   byId("refineStatus").textContent = "";
-  for (const id of ["pdfViewerTrigger", "imradViewerCard", "consentNotice", "aiAccessNotice"]) byId(id).hidden = true;
+  for (const id of ["watermarkedReader", "imradViewerCard", "consentNotice", "aiAccessNotice"]) byId(id).hidden = true;
   byId("insightsScroll").hidden = false;
   byId("analysisStatus").textContent = "Loading…";
   byId("relatedOrigin").textContent = "Sources from the opening similarity analysis, in returned order. Up to five unique papers.";
@@ -311,13 +310,13 @@ async function initPage() {
   renderPaperInfo({ title: "Loading research…", abstract: "Loading…" });
   for (const config of Object.values(ANALYSIS)) setLoading(byId(config.box), config.loading);
   const auth = apiMe().catch(() => null);
-  const paper = context.source ? apiDocumentDetail(context.source) : Promise.reject(new Error("No document ID specified."));
+  const paper = /^[1-9]\d*$/.test(context.source || "") ? apiDocumentById(context.source) : Promise.reject(new Error("No document ID specified."));
   const [identity, documentResult] = await Promise.allSettled([auth, paper]);
   if (!isCurrent(context)) return;
   const me = identity.value;
   if (!me) { window.location.replace("index.html"); return; }
   canUseAI = !!me && ["student", "librarian"].includes(me.role);
-  if (!document.getElementById("grid")) applyNav(me?.role || "guest");
+  if (!document.getElementById("grid") && !document.getElementById("askMain")) applyNav(me?.role || "guest");
   if (me) {
     const avatar = byId("avatarEl");
     const role = byId("rolePill");
@@ -333,30 +332,44 @@ async function initPage() {
     byId("analysisStatus").textContent = "Unavailable";
     renderText(byId("relatedBox"), "Related Research is unavailable because the paper could not be loaded.");
     byId("relatedBox").setAttribute("aria-busy", "false");
+    const retry = element("button", "btn btn-ghost btn-sm", "Retry research details");
+    retry.type = "button";
+    retry.addEventListener("click", initPage);
+    byId("abstractText").appendChild(retry);
     return;
   }
   paperData = documentResult.value;
   context.id = researchId = paperData.id;
   renderPaperInfo(paperData);
-  const consent = !!paperData.public_pdf_consent;
-  byId("pdfViewerTrigger").hidden = !consent;
-  byId("consentNotice").hidden = consent || canUseAI;
+  const allowed = paperData.can_view_pdf === true;
+  byId("watermarkedReader").hidden = !allowed;
+  byId("consentNotice").hidden = allowed;
+  if (!allowed) {
+    const messages = {
+      not_approved: "This paper is not approved for public viewing.",
+      not_consented: "The author has not allowed public viewing of this paper.",
+    };
+    byId("consentNotice").textContent = messages[paperData.pdf_block_reason] || "Reader permission is unavailable. Please reopen this paper to try again.";
+  } else pageReader = new WatermarkedReader(byId("readerPages"), context.id);
   if (!canUseAI) {
     byId("insightsScroll").hidden = true;
     byId("aiAccessNotice").hidden = false;
-    byId("aiAccessNotice").textContent = "Research Insights is available to students and library staff. You can read the paper's abstract and any PDF the author permits you to view.";
     byId("analysisStatus").textContent = "Reading only";
-    renderText(byId("relatedBox"), "Related Research is available to students and library staff.");
-    byId("relatedBox").setAttribute("aria-busy", "false");
     return;
   }
   byId("refineForm").hidden = false;
-  byId("imradViewerCard").hidden = consent;
-  await Promise.all([runSummary(), runSimilarity(), runGaps(), ...(!consent ? [runImrad()] : [])]);
+  byId("imradViewerCard").hidden = allowed;
+  await Promise.all([runSummary(), runSimilarity(), runGaps(), ...(!allowed ? [runImrad()] : [])]);
 }
+
+window.addEventListener("pagehide", () => pageReader?.destroy());
+// A browser back/forward-cache restore needs fresh Blob URLs after pagehide cleanup.
+window.addEventListener("pageshow", event => {
+  if (event.persisted && activePaper) initPage();
+});
 
 window.iPeekDetail = {
   open: initPage,
-  close() { activePaper = null; canUseAI = false; },
+  close() { activePaper = null; canUseAI = false; pageReader?.destroy(); pageReader = null; },
 };
 })();

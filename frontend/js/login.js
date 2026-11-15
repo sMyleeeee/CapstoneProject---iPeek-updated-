@@ -6,8 +6,7 @@
  *
  * IMPORTANT: role is NOT chosen by the user anywhere in this file.
  * It's derived entirely server-side from the institutional email
- * domain (@students.isatu.edu.ph -> student, @isatu.edu.ph -> librarian
- * or faculty depending on the LIBRARIAN_EMAILS allowlist). See
+ * domain (student email or an allowlisted librarian address). See
  * backend: services/otp_service.py::determine_role_from_email().
  * There is intentionally no role selector in this UI — trusting a
  * client-supplied role was the original security gap this replaces.
@@ -72,13 +71,8 @@ async function login() {
     sessionStorage.setItem("role", result.role);
     sessionStorage.setItem("uid",  result.full_name || uid);
 
-    const dest = {
-      student:   "browse.html",
-      faculty:   "browse.html",
-      librarian: "dashboard.html",
-    };
-
-    window.location.href = dest[result.role] || "browse.html";
+    const me = await apiMe();
+    window.location.href = landingPage(me);
 
   } catch (e) {
     showErr("loginErr", e.message || "Invalid credentials.");
@@ -93,6 +87,8 @@ async function sendOtp() {
   const fullname = document.getElementById("regFullname").value.trim();
   const email    = document.getElementById("regEmail").value.trim();
   const dept     = document.getElementById("regDept").value;
+  document.getElementById("regEmailErr").textContent = "";
+  document.getElementById("regEmail").removeAttribute("aria-invalid");
 
   if (!fullname || !email) {
     showErr("regErr", "Please fill in your full name and institutional email.");
@@ -118,8 +114,8 @@ async function sendOtp() {
     await apiRequestOtp(email);
     showOtpStep(email);
   } catch (e) {
-    console.error("OTP request failed:", e);
-    showErr("regErr", e.message || "Could not send verification code.");
+    showErr("regEmailErr", e.message || "Could not send verification code.");
+    document.getElementById("regEmail").setAttribute("aria-invalid", "true");
   } finally {
     btn.disabled = false;
     btn.textContent = "Send Verification Code";
@@ -230,5 +226,16 @@ async function confirmReset() {
   } catch (error) { showErr("resetErr", error.message); }
   finally { btn.disabled = false; btn.textContent = "Verify and reset password"; document.getElementById("resetRequest").disabled = false; }
 }
-loadColleges();
+// Existing sessions go to their server-suggested home.
+async function initializeHome() {
+  if (_getToken()) {
+    try { window.location.replace(landingPage(await apiMe())); return; }
+    catch (error) {
+      if (error.status === 403) sessionStorage.clear();
+      showErr("loginErr", error.message);
+    }
+  }
+  await loadColleges();
+}
+initializeHome();
 if (new URLSearchParams(window.location.search).has("expired")) showErr("loginErr", "Your session expired. Please log in again.");

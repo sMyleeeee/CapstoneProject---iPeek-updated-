@@ -97,12 +97,6 @@
   box-shadow: var(--shadow-inset-sm);
 }
 
-/* Make keyboard focus visible on links and buttons. */
-.dashboard-main :is(a, button):focus-visible {
-  outline: 3px solid var(--primary);
-  outline-offset: 3px;
-}
-
 .dashboard-main .btn:hover {
   text-decoration: none;
 }
@@ -459,45 +453,6 @@
   color: #954343;
 }
 
-
-/* ==========================================================
-   LIBRARY TERMINAL SESSIONS
-   ========================================================== */
-
-.dashboard-session-count {
-  margin-bottom: 14px;
-  font-size: .78rem;
-  color: var(--muted);
-}
-
-.dashboard-session-count strong {
-  font-size: 1.3rem;
-  color: var(--text);
-  margin-right: 5px;
-}
-
-/* Separate individual session entries with a divider. */
-.dashboard-session {
-  padding: 14px 0;
-  border-top: 1px solid var(--border);
-}
-
-.dashboard-session h3 {
-  font-family: var(--font-sans);
-  font-size: .86rem;
-  color: var(--text);
-  overflow-wrap: anywhere;
-}
-
-/* Allow session action buttons to wrap on narrow panels. */
-.dashboard-session-actions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  align-items: center;
-  margin-top: 10px;
-}
-
 .dashboard-action-status {
   font-size: .75rem;
   margin-top: 8px;
@@ -507,15 +462,6 @@
 /* Avoid leaving space for an empty status message. */
 .dashboard-action-status:empty {
   display: none;
-}
-
-.dashboard-terminal-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 40px;
-  margin-top: 10px;
-  font-size: .8rem;
 }
 
 
@@ -620,18 +566,6 @@
 
 .dashboard-main #repositoryStatus {
   min-height: 76px;
-}
-
-.dashboard-main #kioskSessionList {
-  min-height: 64px;
-}
-
-/*
- * Preserve this later override from the original stylesheet:
- * the session count uses the primary color.
- */
-.dashboard-session-count strong {
-  color: var(--primary);
 }
 
 

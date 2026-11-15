@@ -303,8 +303,8 @@ function onConsentChange(el) {
   const hint = document.getElementById("consentHint");
   if (hint && el.checked) {
     hint.textContent = el.value === "true"
-      ? "Your full PDF will be publicly viewable on the research's detail page."
-      : "Remote viewers will only see the AI-generated IMRaD summary.";
+      ? "After approval, other students may read your paper in the watermarked reader."
+      : "Other students cannot open the full paper. You and librarians retain reader access.";
     hint.classList.add("selected");
   }
 }

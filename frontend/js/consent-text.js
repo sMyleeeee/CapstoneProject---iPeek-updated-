@@ -14,16 +14,14 @@
  */
 const PUBLIC_PDF_CONSENT_STATEMENT = `Public Availability of Your Research — Please Read Before Submitting
 
-You're about to submit your research for librarian review. Please indicate whether you permit the full PDF of your paper to be publicly viewable by other students and faculty within iPeek.
+Please choose whether other students and librarians may read your approved paper in iPeek's watermarked reader.
 
 If you permit public viewing:
-- The complete PDF will be viewable by other verified students and faculty on the research's detail page.
-- You acknowledge that making your work publicly accessible carries an inherent risk that it could be copied, improperly cited, or plagiarized by others.
-- iPeek and its developers are not responsible for any unauthorized copying, plagiarism, or misuse of your research resulting from this visibility. Responsibility for monitoring and addressing such misuse rests with you and/or the institution.
-- Your paper remains accessible for in-person library viewing either way, per institutional policy.
+- After approval, other students can read the complete paper as watermarked page images.
+- The reader identifies the viewer by email and date. Screenshots cannot be prevented.
 
 If you do not permit public viewing:
-- Other students and faculty will only see an AI-generated summary (Introduction, Methods, Results, Discussion) of your research — not the full document.
-- The full PDF remains accessible only in-person at the library, under supervision.
+- Other students cannot open the full paper in the reader. Repository metadata and AI analyses may still be available.
+- You and librarians retain access regardless of your choice or review status. Librarians can access the PDF for review.
 
-This is a draft statement pending final policy from the institution/librarian — not a substitute for formal legal review.`;
+Your choice does not authorize copying, plagiarism, or misuse. This draft statement remains subject to the institution's final policy.`;

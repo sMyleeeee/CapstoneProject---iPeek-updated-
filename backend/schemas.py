@@ -292,12 +292,19 @@ class AnalysisOut(BaseModel):
     sources: list[AnalysisSource]
 
 
-# ---------- Repository Q&A (single-turn, cited) ----------
+# ---------- Repository Q&A (bounded context, cited) ----------
+
+class AskTurn(BaseModel):
+    query: str = Field(min_length=1, max_length=1500)
+    answer: str = Field(max_length=2000)
+    research_ids: list[int] = Field(default_factory=list, max_length=12)
+
 
 class AskIn(BaseModel):
     query: str = Field(min_length=1, max_length=500)
     college_id: Optional[int] = None
     year: Optional[int] = None
+    context: list[AskTurn] = Field(default_factory=list, max_length=4)
 
     @field_validator("query")
     @classmethod
@@ -324,3 +331,6 @@ class AskOut(BaseModel):
     answer: str
     found: bool
     citations: list[AskCitationOut]
+    resolved_query: str = ""
+    clarification_needed: bool = False
+    topic_changed: bool = False

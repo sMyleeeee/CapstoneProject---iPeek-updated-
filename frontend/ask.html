@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content">
+  <title>iPeek — Ask the Repository</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/ask.css">
+  <link rel="stylesheet" href="css/detail.css">
+  <script src="js/page-fade.js" defer blocking="render"></script>
+</head>
+<body>
+  <nav class="navbar" aria-label="Main navigation">
+    <div class="nav-brand"><div class="nav-logo">i</div>Research Repository</div>
+    <div class="nav-links"></div>
+    <div class="nav-right"><span class="avatar" id="avatarEl"></span><span class="role-pill" id="rolePill"></span></div>
+  </nav>
+  <main class="ask-main" id="askMain">
+    <header class="ask-heading" id="askWelcome">
+      <p class="ask-eyebrow">EXPLORE YOUR REPOSITORY</p>
+      <h1 id="welcomeHeading">Welcome back</h1>
+      <p>Discover answers from approved repository research, with sources you can explore.</p>
+    </header>
+    <p id="askSession" role="status">Checking your session…</p>
+    <button id="sessionRetry" class="btn btn-ghost" type="button" hidden>Retry session check</button>
+    <div id="conversationHeader" class="ask-conversation-header" hidden>
+      <h1>Ask Research</h1>
+      <button id="newConversation" class="btn btn-ghost btn-sm" type="button">New conversation</button>
+    </div>
+    <div class="ask-workspace">
+    <div class="ask-conversation">
+    <section id="messages" class="ask-messages" aria-label="Questions and answers" hidden></section>
+    <form id="askForm" class="ask-prompt" hidden>
+      <div class="ask-input-surface">
+      <label class="ask-sr-only" for="askQuery">Your research question</label>
+      <textarea id="askQuery" class="form-input" rows="2" maxlength="500" required aria-describedby="askHelp askCount" placeholder="Ask a research question…"></textarea>
+      <div class="ask-controls">
+        <button id="filterToggle" class="ask-filter-toggle" type="button" aria-haspopup="dialog" aria-controls="askFilters" aria-expanded="false"><span>Filter</span><span id="filterIndicator" class="ask-filter-indicator" hidden></span></button>
+        <span id="askCount" class="ask-count">0 / 500</span>
+        <button id="askButton" class="btn btn-accent" type="submit" aria-label="Submit question" title="Submit question"></button>
+      </div>
+      </div>
+      <p id="askHelp" class="ask-note">Follow-ups use recent exchanges in this conversation. New conversation clears context. Up to 500 characters.</p>
+    </form>
+    <div id="askSuggestions" class="ask-suggestions" hidden>
+      <button type="button" data-starter="smart irrigation system">smart irrigation system</button>
+      <button type="button" data-starter="e-waste awareness in communities">e-waste awareness in communities</button>
+      <button type="button" data-starter="AI in education">AI in education</button>
+    </div>
+    </div>
+      <aside id="sourcesPanel" class="ask-sources" aria-labelledby="sourcesHeading" hidden>
+        <h2 id="sourcesHeading">Sources</h2>
+        <p id="selectedAnswer" class="ask-note"></p>
+        <div id="sourceCards" class="ask-source-host"></div>
+      </aside>
+    </div>
+    <dialog id="askFilters" class="ask-filter-panel" aria-labelledby="filterHeading">
+      <div class="ask-filter-header"><h2 id="filterHeading">Research filters</h2><button id="filterClose" class="btn btn-ghost btn-sm" type="button" aria-label="Close filters"></button></div>
+      <div><label class="form-label" for="askCollege">College</label><select id="askCollege" class="form-input" disabled><option value="">All colleges</option></select></div>
+      <div><label class="form-label" for="askYear">Year</label><select id="askYear" class="form-input" disabled><option value="">All years</option></select></div>
+      <p id="filterStatus" class="ask-note" role="status"></p>
+      <button id="filterRetry" class="btn btn-ghost btn-sm" type="button" hidden>Reload filters</button>
+      <div class="ask-filter-actions"><button id="filterReset" class="btn btn-ghost btn-sm" type="button">Reset filters</button><button id="filterDone" class="btn btn-accent btn-sm" type="button">Done</button></div>
+    </dialog>
+    <p id="askAnnouncement" class="ask-sr-only" role="status" aria-live="polite" aria-atomic="true"></p>
+  </main>
+  <div class="toast-wrap" id="toasts"></div>
+  <script src="js/api.js"></script>
+  <script src="js/pillnav.js"></script>
+  <script src="js/ask.js"></script>
+  <script src="js/reader.js"></script>
+  <script src="js/detail.js"></script>
+  <script src="js/detail-overlay.js"></script>
+</body>
+</html>

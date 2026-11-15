@@ -513,12 +513,6 @@
   box-shadow: var(--shadow-sm);
 }
 
-/* Visible keyboard-focus indicator. */
-.detail-workspace :focus-visible {
-  outline: 3px solid var(--primary);
-  outline-offset: 3px;
-}
-
 /* Hide supporting text visually without display: none. */
 .detail-workspace .sr-only {
   position: absolute;
@@ -920,3 +914,10 @@
     transform: none;
   }
 }
+/* Page pixels arrive only from authenticated Blob fetches, never a PDF embed. */
+.watermarked-pages { user-select: none; -webkit-user-select: none; min-width: 0; }
+.reader-page { width: 100%; margin: 18px 0; background: #fff; border: 1px solid var(--border); overflow: hidden; }
+.reader-page > p { padding: 16px; }
+.reader-page img { display: block; width: 100%; height: auto; pointer-events: none; -webkit-user-drag: none; }
+.reader-page button { margin: 16px; }
+@media print { .watermarked-pages { display: none !important; } }

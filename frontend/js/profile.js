@@ -17,6 +17,7 @@ async function initNav() {
     currentUser = await apiMe();
     applyNav(currentUser.role);
     populateProfile(currentUser);
+    await loadProfileColleges();
     saveOriginalValues();
   } catch {
     window.location.replace("index.html");
@@ -52,6 +53,7 @@ function populateProfile(me) {
   document.getElementById("lastName").value  = parts.slice(1).join(" ") || "";
   document.getElementById("email").value     = me.email || "";
   document.getElementById("contact").value   = me.contact || "";
+  document.getElementById("department").value = me.department || "";
 }
 
 /* Store original values so Cancel can restore them */
@@ -135,7 +137,7 @@ async function saveChanges() {
 
   /* Profile fields — saved first, always attempted */
   try {
-    const updated = await apiUpdateProfile(fullName, email, contact);
+    const updated = await apiUpdateProfile(fullName, email, contact, document.getElementById("department").disabled ? undefined : document.getElementById("department").value);
     currentUser = updated;
     populateProfile(updated);
     saveOriginalValues();
@@ -174,4 +176,22 @@ function cancelChanges() {
   ["pwSeg1", "pwSeg2", "pwSeg3"].forEach(id => { document.getElementById(id).className = "pw-segment"; });
   document.getElementById("pwLabel").textContent = "";
   toast("Changes cancelled.", "info");
+}
+async function loadProfileColleges() {
+  const select = document.getElementById("department");
+  const status = document.getElementById("departmentStatus");
+  const retry = document.getElementById("departmentRetry");
+  select.disabled = true; retry.hidden = true;
+  status.textContent = "Loading colleges...";
+  try {
+    const colleges = await apiColleges();
+    select.replaceChildren(new Option("No college selected", ""));
+    colleges.forEach(c => select.add(new Option(`${c.code} — ${c.name}`, c.name)));
+    const stored = currentUser.department || "";
+    // Preserve legacy values until the user explicitly chooses a canonical college.
+    if (stored && !colleges.some(c => c.name === stored)) select.add(new Option(stored, stored));
+    select.value = stored; origValues.department = stored;
+    select.disabled = currentUser.role === "librarian";
+    status.textContent = currentUser.role === "librarian" ? "Librarians are not tied to a college." : "";
+  } catch (error) { status.textContent = error.message; retry.hidden = false; }
 }

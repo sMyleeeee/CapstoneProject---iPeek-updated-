@@ -73,13 +73,9 @@
 
         <div class="form-group">
           <label class="form-label" for="department">Department</label>
-          <select class="form-input" id="department">
-            <option>Library Services</option>
-            <option>College of Engineering</option>
-            <option>College of Computing</option>
-            <option>College of Arts &amp; Sciences</option>
-            <option>IT Department</option>
-          </select>
+          <select class="form-input" id="department" disabled aria-describedby="departmentStatus"><option value="">Loading colleges...</option></select>
+          <p id="departmentStatus" class="form-status" role="status"></p>
+          <button type="button" id="departmentRetry" class="btn btn-ghost btn-sm" hidden onclick="loadProfileColleges()">Reload colleges</button>
         </div>
 
         <hr class="divider">

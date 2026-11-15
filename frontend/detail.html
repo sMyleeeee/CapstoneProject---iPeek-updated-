@@ -44,17 +44,17 @@
             <h2 class="section-label" id="abstractHeading">Abstract</h2>
             <div class="abstract-text" id="abstractText">Loading...</div>
           </section>
-          <section id="pdfViewerTrigger" class="card paper-document" hidden aria-label="Full paper">
-            <button id="readPdfBtn" type="button" class="btn btn-accent btn-full">
-              <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><use href="icons.svg#document"/></svg> Read Full Version
-            </button>
+          <section id="watermarkedReader" class="card paper-document" hidden aria-labelledby="readerHeading">
+            <h2 id="readerHeading" class="section-label">Read the paper</h2>
+            <p class="insight-note">Pages are watermarked with your email and today's date. Screenshots cannot be prevented. The watermark identifies the viewer.</p>
+            <div id="readerPages" class="watermarked-pages"></div>
           </section>
           <section id="imradViewerCard" class="card paper-document" hidden aria-labelledby="imradHeading">
             <h2 class="section-label" id="imradHeading">IMRaD Summary</h2>
-            <p class="insight-note">The author did not permit remote PDF viewing. This AI-generated guide uses retrieved repository context; consult the full paper at the Library Viewing Station to verify its methods and findings.</p>
+            <p class="insight-note">This AI-generated guide uses retrieved repository context. Verify its methods and findings against the cited papers.</p>
             <div class="ai-box" id="imradBox" aria-live="polite"></div>
           </section>
-          <p id="consentNotice" class="insight-note" hidden>The author did not permit remote PDF viewing. The full paper is available at the Library Viewing Station.</p>
+          <p id="consentNotice" class="insight-note" hidden>Reader access is unavailable.</p>
       </section>
       <div class="analysis-workspace">
       <section id="insightsPanel" class="insights-panel" aria-labelledby="insightsHeading">
@@ -62,7 +62,7 @@
           <div><p class="reading-eyebrow">READ WITH CONTEXT</p><h2 id="insightsHeading">Research Insights</h2></div>
           <span class="badge badge-pending" id="analysisStatus" role="status">Loading...</span>
         </header>
-        <p id="aiAccessNotice" class="access-notice" hidden>Research Insights is available to students and library staff. You can read the paper's abstract and any PDF the author permits you to view.</p>
+        <p id="aiAccessNotice" class="access-notice" hidden>Research Insights is available to students and librarians. You can read the paper's abstract and any PDF the author permits you to view.</p>
         <div id="insightsScroll" class="insights-scroll">
           <article id="openingResponse" class="insight-message" aria-label="iPeek opening analysis">
             <div class="message-label"><span class="ipeek-mark" aria-hidden="true">i</span> iPeek <span class="message-context">Opening analysis</span></div>
@@ -102,6 +102,7 @@
   <script src="js/api.js"></script>
   <script src="js/pillnav.js"></script>
   <script src="js/motion.js"></script>
+  <script src="js/reader.js"></script>
   <script src="js/detail.js"></script>
   <script src="js/detail-overlay.js"></script>
 

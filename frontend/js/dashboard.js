@@ -47,7 +47,7 @@ function panelMessage(container, text, retry) {
 async function initPage() {
   try {
     const me = await apiMe();
-    if (me.role !== 'librarian') { location.replace('browse.html'); return; }
+    if (me.role !== 'librarian') { location.replace(landingPage(me)); return; }
     applyNav(me.role);
     const name = me.full_name || me.username || 'Librarian';
     byDashboardId('greeting').textContent = `Welcome, ${name}.`;
@@ -57,7 +57,7 @@ async function initPage() {
   } catch { location.replace('index.html'); return; }
   byDashboardId('refreshHealth').addEventListener('click', loadRepositoryStatus);
   byDashboardId('retryMetrics').addEventListener('click', loadDashboardMetrics);
-  await Promise.allSettled([loadDashboardMetrics(), loadRecentSubmissions(), loadRepositoryStatus(), loadKioskSessions()]);
+  await Promise.allSettled([loadDashboardMetrics(), loadRecentSubmissions(), loadRepositoryStatus()]);
 }
 let metricsLoading = false;
 async function loadDashboardMetrics() {
@@ -93,7 +93,7 @@ function renderReviewQueue(pending, loading = false) {
   const panel = byDashboardId('reviewQueueStatus');
   const known = validCount(pending);
   panel.dataset.state = loading ? 'loading' : !known ? 'unavailable' : pending ? 'pending' : 'clear';
-  byDashboardId('queueTitle').textContent = loading ? 'Checking review queue…' : !known ? 'Review queue status unavailable' : pending ? `${displayCount(pending)} ${pending === 1 ? 'submission needs' : 'submissions need'} review` : 'Review queue is clear';
+  byDashboardId('queueTitle').textContent = loading ? 'Checking review queueâ€¦' : !known ? 'Review queue status unavailable' : pending ? `${displayCount(pending)} ${pending === 1 ? 'submission needs' : 'submissions need'} review` : 'Review queue is clear';
   byDashboardId('pendingMsg').textContent = loading ? 'Loading submission counts.' : !known ? 'Open the review queue to check submissions.' : pending ? 'Review the latest submissions and provide a decision.' : 'No submissions are waiting for review.';
   byDashboardId('reviewQueueAction').hidden = loading || (known && pending === 0);
 }
@@ -124,7 +124,7 @@ function renderRecentList(submissions) {
   submissions.forEach(paper => {
     const row = document.createElement('tr');
     const research = dashboardNode('td', 'dashboard-research');
-    research.append(dashboardNode('span', 'dashboard-research-title', paper.title || 'Untitled research'), dashboardNode('span', 'dashboard-muted', [paper.lead_researcher || 'Authors unavailable', paper.department || 'College unavailable'].join(' · ')));
+    research.append(dashboardNode('span', 'dashboard-research-title', paper.title || 'Untitled research'), dashboardNode('span', 'dashboard-muted', [paper.lead_researcher || 'Authors unavailable', paper.department || 'College unavailable'].join(' Â· ')));
     const submitted = dashboardNode('td', 'dashboard-date', dashboardDate(paper.submitted_at));
     submitted.dataset.label = 'Submitted';
     const status = document.createElement('td'); status.dataset.label = 'Status';
@@ -132,7 +132,7 @@ function renderRecentList(submissions) {
     const badge = dashboardNode('span', `dashboard-badge ${Object.hasOwn(statuses, paper.status) ? paper.status : ''}`, statuses[paper.status] || 'Status unavailable');
     status.appendChild(badge);
     const action = document.createElement('td'); action.className = 'dashboard-open';
-    const href = paper.status === 'approved' && paper.source ? `detail.html?id=${encodeURIComponent(paper.source)}` : `review.html?id=${encodeURIComponent(paper.id)}`;
+    const href = paper.status === 'approved' && paper.source ? `detail.html?id=${encodeURIComponent(paper.id)}` : `review.html?id=${encodeURIComponent(paper.id)}`;
     const link = dashboardNode('a', '', 'Open ');
     link.href = href;
     link.setAttribute('aria-label', `Open ${paper.title || 'research submission'}`);
@@ -140,53 +140,6 @@ function renderRecentList(submissions) {
     action.appendChild(link); row.append(research, submitted, status, action); body.appendChild(row);
   });
   table.append(caption, head, body); list.replaceChildren(table);
-}
-let sessionsLoading = false;
-async function loadKioskSessions() {
-  if (sessionsLoading) return;
-  sessionsLoading = true;
-  const list = byDashboardId('kioskSessionList');
-  const focused = list.contains(document.activeElement) ? {sid:document.activeElement.dataset.sid, action:document.activeElement.dataset.action} : null;
-  list.setAttribute('aria-busy', 'true');
-  dashboardLoading(byDashboardId('kioskSessionCount'), 'Loading...');
-  dashboardLoading(list, 'Loading terminal sessions...', 1);
-  try {
-    const data = await apiKioskSessions();
-    if (!Array.isArray(data.sessions)) throw new Error('Invalid sessions response');
-    const sessions = data.sessions.filter(session => session.is_kiosk === true);
-    byDashboardId('kioskSessionCount').textContent = displayCount(sessions.length);
-    list.replaceChildren();
-    if (!sessions.length) panelMessage(list, 'No library terminal sessions are active.');
-    sessions.forEach(session => {
-      const row = dashboardNode('article', 'dashboard-session');
-      row.append(dashboardNode('h3', '', session.user || 'User unavailable'), dashboardNode('p', 'dashboard-muted', `${session.role || 'Role unavailable'} · ${dashboardDate(session.updated_at, true)}`));
-      const controls = dashboardNode('div', 'dashboard-session-actions');
-      controls.appendChild(dashboardNode('span', 'dashboard-badge', session.locked ? 'Locked' : 'Open'));
-      const status = dashboardNode('p', 'dashboard-action-status'); status.setAttribute('role','status');
-      const buttons = [];
-      for (const action of ['lock', 'terminate']) {
-        const button = dashboardNode('button', 'btn btn-ghost btn-sm', action === 'lock' ? session.locked ? 'Unlock' : 'Lock' : 'Terminate');
-        button.type = 'button'; button.dataset.sid = session.sid; button.dataset.action = action;
-        button.setAttribute('aria-label', `${button.textContent} terminal session for ${session.user || 'user'}`);
-        button.addEventListener('click', async () => {
-          if (action === 'terminate' && !confirm(`Terminate the terminal session of "${session.user}"?\nIt will be removed from this list and any page lock on it will be lifted.`)) return;
-          buttons.forEach(btn => btn.disabled = true); status.textContent = 'Updating session…';
-          try {
-            if (action === 'lock') await apiKioskSetLockFor(session.sid, !session.locked);
-            else await apiKioskTerminate(session.sid);
-            await loadKioskSessions();
-          } catch (error) { status.textContent = `Session update failed: ${error.message}`; buttons.forEach(btn => btn.disabled = false); }
-        });
-        buttons.push(button); controls.appendChild(button);
-      }
-      row.append(controls, status); list.appendChild(row);
-    });
-    if (focused) {
-      const target = [...list.querySelectorAll('button')].find(btn => btn.dataset.sid === focused.sid && btn.dataset.action === focused.action);
-      (target || document.querySelector('.dashboard-terminal-link')).focus({preventScroll:true});
-    }
-  } catch { byDashboardId('kioskSessionCount').textContent = 'Unavailable'; panelMessage(list, 'Terminal sessions could not be loaded.', loadKioskSessions); }
-  finally { sessionsLoading = false; list.setAttribute('aria-busy','false'); }
 }
 let healthLoading = false;
 async function loadRepositoryStatus() {

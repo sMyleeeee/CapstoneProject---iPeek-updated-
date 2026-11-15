@@ -129,7 +129,7 @@ function render() {
 
     /* Click handler via addEventListener — source never interpolated
        into an attribute string, preventing onclick injection */
-    card.href = `detail.html?id=${encodeURIComponent(d.source)}`;
+    card.href = `detail.html?id=${encodeURIComponent(d.id)}`;
 
     /* College · Year */
     const idEl = document.createElement("div");
@@ -188,10 +188,6 @@ async function loadBrowseFilters() {
 }
 function syncCollegeButtons() {
   document.querySelectorAll("[data-college]").forEach(button => button.classList.toggle("active", button.dataset.college === String(filters.college)));
-}
-
-function openDetail(source) {
-  window.location.href = `detail.html?id=${encodeURIComponent(source)}`;
 }
 
 /* ── Live search ─────────────────────────────────────────────────────────── */

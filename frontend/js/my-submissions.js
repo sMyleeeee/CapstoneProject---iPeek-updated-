@@ -113,20 +113,14 @@ function renderList(submissions) {
     }
 
 
-    /* Uploaders keep full-PDF access to their OWN papers (backend
-       ownership exemption) — everywhere else full PDFs are kiosk-only. */
-    if (s.source_stem) {
-      const footer = document.createElement("div");
-      footer.style.cssText = "display:flex;justify-content:flex-end;margin-top:8px;";
-
-      const viewBtn = document.createElement("button");
-      viewBtn.className   = "btn btn-ghost btn-sm";
-      viewBtn.textContent = "View Full PDF";
-      viewBtn.addEventListener("click", () => viewPdfInNewTab(apiPdfUrl(s.source_stem)));
-      footer.appendChild(viewBtn);
-
-      card.appendChild(footer);
-    }
+    // Owners use the permission-aware reader for every review status.
+    const footer = document.createElement("div");
+    const view = document.createElement("a");
+    view.className = "btn btn-ghost btn-sm";
+    view.href = `detail.html?id=${encodeURIComponent(s.id)}`;
+    view.textContent = "Read paper";
+    footer.appendChild(view);
+    card.appendChild(footer);
 
     list.appendChild(card);
   });

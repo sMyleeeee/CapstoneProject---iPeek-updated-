@@ -61,19 +61,15 @@ function createSignOutButton() {
 /* ── Nav link sets ──────────────────────────────────────────────────── */
 const NAV_LINKS = {
   student: [
-    { href: "browse.html",  label: "Browse Research",  id: "browse",    icon: "browse" },
-    { href: "upload.html",  label: "Submit Proposal",  id: "upload",    icon: "upload" },
-    { href: "my-submissions.html", label: "My Submissions", id: "my-submissions", icon: "my-submissions" },
-  ],
-  faculty: [
+    { href: "ask.html", label: "Ask", id: "ask", icon: "search" },
     { href: "browse.html",  label: "Browse Research",  id: "browse",    icon: "browse" },
     { href: "upload.html",  label: "Submit Proposal",  id: "upload",    icon: "upload" },
     { href: "my-submissions.html", label: "My Submissions", id: "my-submissions", icon: "my-submissions" },
   ],
   librarian: [
+    { href: "ask.html", label: "Ask", id: "ask", icon: "search" },
     { href: "dashboard.html", label: "Dashboard",     id: "dashboard", icon: "dashboard" },
     { href: "review.html",    label: "Review Queue",  id: "review",    icon: "review" },
-    { href: "library.html",   label: "Library Terminal", id: "library", icon: "library" },
     { href: "browse.html",    label: "Browse",        id: "browse",    icon: "browse" },
     { href: "upload.html",    label: "Upload",        id: "upload",    icon: "upload" },
     { href: "my-submissions.html", label: "My Submissions", id: "my-submissions", icon: "my-submissions" },
@@ -81,19 +77,10 @@ const NAV_LINKS = {
   ],
 };
 
-/* ── Kiosk lock guard ──────────────────────────────────────────────
- * Scoped to THIS login session (JWT "sid") — see backend kiosk_routes.
- * applyNav() is called by every logged-in page, so it doubles as the
- * single route-guard hook: if this session is locked and we're not on
- * library.html, redirect there before rendering any nav links.
- */
-let _kioskGuardTimer  = null;
-let _kioskLastState   = null;
-let _navIdentity      = null;   // {avatarEl, rolePill} kept alive across hidden re-renders
+let _navIdentity = null;
 let _renderedNavState = null;
 
-// Presentation only: keep the last verified session's header visible while the
-// new document repeats its auth/kiosk checks. Never use this for route access.
+// Restore presentation only; every page still verifies the session with /auth/me.
 function restoreNavPresentation() {
   if (!_getToken() || !document.querySelector(".navbar")) return;
   try {
@@ -103,59 +90,18 @@ function restoreNavPresentation() {
     const role = document.getElementById("rolePill");
     if (avatar) avatar.textContent = saved.initials;
     if (role) role.textContent = saved.label;
-    _renderNav(saved.role, { hidden: saved.hidden });
+    _renderNav(saved.role);
   } catch { /* Storage unavailable: normal authenticated initialization follows. */ }
 }
 
 function applyNav(role) {
-  _kioskGuard(role).catch(() => _renderNav(role, { hidden: false }));
+  _renderNav(role);
 }
 
-async function _kioskGuard(role) {
-  const page = window.location.pathname.split("/").pop();
-  let locked = false;
-
-  if (_getToken()) {
-    try {
-      locked = !!(await apiKioskStatus()).locked;
-    } catch { locked = false; }   // fail open: no backend / bad token = never locked
-  }
-
-  if (locked && page !== "library.html") {
-    window.location.replace("library.html");
-    return;
-  }
-
-  _renderNav(role, { hidden: locked });
-  _kioskLastState = locked ? "locked" : "unlocked";
-  _startKioskPoll(role, page);
-}
-
-/* Polls lock state so tabs already open react: a remote dashboard lock
-   redirects them, and a remote unlock restores the kiosk page's nav. */
-function _startKioskPoll(role, page) {
-  if (_kioskGuardTimer) clearInterval(_kioskGuardTimer);
-  if (!_getToken()) return;
-  _kioskGuardTimer = setInterval(async () => {
-    try {
-      const locked = !!(await apiKioskStatus()).locked;
-      const state  = locked ? "locked" : "unlocked";
-      if (page !== "library.html") {
-        if (locked) window.location.replace("library.html");
-      } else if (state !== _kioskLastState) {
-        _kioskLastState = state;
-        _renderNav(role, { hidden: locked });
-        window.dispatchEvent(new CustomEvent("kiosk-lock-change", { detail: { locked } }));
-      }
-    } catch { /* backend briefly unreachable — keep current UI */ }
-  }, 15000);
-}
-
-function _renderNav(role, opts) {
-  const hidden = !!(opts && opts.hidden);
+function _renderNav(role) {
   const container = document.querySelector(".nav-links");
   if (!container) return;
-  const state = `${role}:${hidden}`;
+  const state = role;
   // Auth confirmation must not replace the restored pill or replay its motion.
   if (_renderedNavState === state) return;
   _renderedNavState = state;
@@ -163,9 +109,7 @@ function _renderNav(role, opts) {
   const current = window.location.pathname.split("/").pop();
 
   /* ── Desktop pill nav ──────────────────────────────────── */
-  if (hidden) {
-    container.innerHTML = "";
-  } else {
+  {
     const track = document.createElement("div");
     track.className = "nav-track";
 
@@ -194,16 +138,14 @@ function _renderNav(role, opts) {
   /* ── Nav right: bell + profile + logout ─────────────────── */
   const navRight = document.querySelector(".nav-right");
   if (navRight) {
-    /* Save references BEFORE clearing — innerHTML destroys these.
-       Stashed in _navIdentity so a hidden (locked) first render can
-       still restore them when the session is unlocked later. */
+    // Preserve identity elements while rebuilding navigation.
     const existingAvatar = document.getElementById("avatarEl") || (_navIdentity && _navIdentity.avatarEl);
     const existingRole   = document.getElementById("rolePill")  || (_navIdentity && _navIdentity.rolePill);
     if (existingAvatar && existingRole) _navIdentity = { avatarEl: existingAvatar, rolePill: existingRole };
 
     navRight.innerHTML = "";
 
-    if (!hidden) {
+    {
       /* Bell notification button */
       const notifWrapper = document.createElement("div");
       notifWrapper.className = "nav-notif-wrapper";
@@ -241,7 +183,7 @@ function _renderNav(role, opts) {
       }
     }
 
-    /* Icon logout button — always kept, even while locked */
+    /* Keep sign out accessible on desktop and mobile. */
     navRight.appendChild(createSignOutButton());
   }
 
@@ -261,7 +203,7 @@ function _renderNav(role, opts) {
   mobileActions.className = "mobile-header-actions";
   mobileHeader.appendChild(mobileActions);
 
-  if (!hidden) {
+  {
     const avatarEl = document.getElementById("avatarEl") || (_navIdentity && _navIdentity.avatarEl);
     const rolePill = document.getElementById("rolePill") || (_navIdentity && _navIdentity.rolePill);
     const initials = avatarEl ? avatarEl.textContent : "?";
@@ -275,7 +217,7 @@ function _renderNav(role, opts) {
   }
 
   /* ── Bottom tab bar ────────────────────────────────────── */
-  if (!hidden) {
+  {
     const wrapper = document.createElement("div"); wrapper.className = "nav-notif-wrapper";
     const bell = document.createElement("button"); bell.className = "nav-icon-btn";
     bell.setAttribute("aria-label", "Notifications");
@@ -295,7 +237,6 @@ function _renderNav(role, opts) {
   bottomBar.innerHTML = "";
 
   document.body.classList.add("nav-ready");
-  if (hidden) return;
 
   const bUl = document.createElement("ul");
   bUl.className = "pill-list";
@@ -313,7 +254,6 @@ function _renderNav(role, opts) {
       "My Submissions": "My Subs",
       "Dashboard": "Home",
       "Review Queue": "Review",
-      "Library Terminal": "Terminal",
       "Upload": "Upload",
       "Browse": "Browse"
     };
@@ -329,10 +269,10 @@ function _renderNav(role, opts) {
 
 function saveNavPresentation() {
   if (!_renderedNavState || !_getToken()) return;
-  const [role, hidden] = _renderedNavState.split(":");
+  const role = _renderedNavState;
   try {
     sessionStorage.setItem("ipeek_nav", JSON.stringify({
-      role, hidden: hidden === "true",
+      role,
       initials: document.getElementById("avatarEl")?.textContent || "",
       label: document.getElementById("rolePill")?.textContent || "",
     }));
@@ -364,71 +304,6 @@ function _getToken() {
 function _authHeaders() {
   const token = _getToken();
   return token ? { "Authorization": `Bearer ${token}` } : {};
-}
-
-function apiAuthHeaderForPdf() {
-  return _authHeaders();
-}
-
-/* ── Kiosk (Library Viewing Station) ────────────────────────────── */
-/* All of these act on the CALLER's own session (JWT "sid") — never on
-   shared/global state. The *For variants are librarian-only and target
-   one specific session by its sid (dashboard lock/unlock control). */
-
-async function apiKioskStatus() {
-  const r = await _apiFetch(`${API_BASE}/kiosk/status`, { headers: _authHeaders() });
-  const d = await r.json();
-  if (!r.ok) throw new Error(d.detail || "Kiosk status unavailable.");
-  return d;
-}
-
-async function apiKioskActivate() {
-  const r = await _apiFetch(`${API_BASE}/kiosk/activate`, { method: "POST", headers: _authHeaders() });
-  const d = await r.json();
-  if (!r.ok) throw new Error(d.detail || "Could not activate this terminal session.");
-  return d;
-}
-
-
-async function apiKioskSessions() {
-  const r = await _apiFetch(`${API_BASE}/kiosk/sessions`, { headers: _authHeaders() });
-  const d = await r.json();
-  if (!r.ok) throw new Error(d.detail || "Could not load terminal sessions.");
-  return d;
-}
-
-async function apiKioskSetLockFor(sid, locked) {
-  const r = await _apiFetch(
-    `${API_BASE}/kiosk/sessions/${encodeURIComponent(sid)}/${locked ? "lock" : "unlock"}`,
-    { method: "POST", headers: _authHeaders() }
-  );
-  const d = await r.json();
-  if (!r.ok) throw new Error(d.detail || "Could not update the session lock.");
-  return d;
-}
-
-/* Removes the CALLER's own session row — fired from library.html on
-   pagehide so a closed terminal drops out of the dashboard tracker.
-   keepalive lets the request survive the page unload. */
-async function apiKioskDeactivate() {
-  const r = await _apiFetch(`${API_BASE}/kiosk/deactivate`, {
-    method: "POST", headers: _authHeaders(), keepalive: true,
-  });
-  const d = await r.json();
-  if (!r.ok) throw new Error(d.detail || "Could not close the terminal session.");
-  return d;
-}
-
-/* Librarian-only: deletes a session row from the tracker (terminate
-   button on the dashboard's Library Terminal Sessions card). */
-async function apiKioskTerminate(sid) {
-  const r = await _apiFetch(
-    `${API_BASE}/kiosk/sessions/${encodeURIComponent(sid)}`,
-    { method: "DELETE", headers: _authHeaders() }
-  );
-  const d = await r.json();
-  if (!r.ok) throw new Error(d.detail || "Could not terminate the terminal session.");
-  return d;
 }
 
 /* ── Auth ────────────────────────────────────────────────────────────── */
@@ -467,21 +342,21 @@ async function apiMe() {
     full_name: d.fullname,
     email:     d.email,
     contact:   d.contact,
-    department: d.department, college_id: d.college_id, college_code: d.college_code,
+    department: d.department, college_id: d.college_id, college_code: d.college_code, landing: d.landing,
   };
 }
 
-async function apiUpdateProfile(fullName, email, contact) {
+async function apiUpdateProfile(fullName, email, contact, department) {
   const r = await _apiFetch(`${API_BASE}/auth/me`, {
     method: "PUT",
     headers: { "Content-Type": "application/json", ..._authHeaders() },
-    body: JSON.stringify({ fullname: fullName, contact }),
+    body: JSON.stringify({ fullname: fullName, contact, ...(department !== undefined ? {department} : {}) }),
   });
   const d = await r.json();
   if (!r.ok) throw new Error(d.detail || "Failed to update profile.");
   return {
     user_id: d.id, username: d.username, role: d.role,
-    full_name: d.fullname, email: d.email, contact: d.contact, department: d.department, college_id: d.college_id, college_code: d.college_code,
+    full_name: d.fullname, email: d.email, contact: d.contact, department: d.department, college_id: d.college_id, college_code: d.college_code, landing: d.landing,
   };
 }
 
@@ -633,7 +508,11 @@ function _mapResearch(item) {
     lead_researcher:  item.authors,
     year:             item.year ? String(item.year) : "Unknown",
     school_year:      item.year ? String(item.year) : "Unknown",
-    college:          item.department,
+    college:          item.college?.name || item.department,
+    college_ref:      item.college || null,
+    can_view_pdf:     item.can_view_pdf,
+    pdf_block_reason: item.pdf_block_reason,
+    page_count:       item.page_count,
     department:       item.department,
     college_id:       item.college_id,
     abstract:         item.abstract || "",
@@ -654,15 +533,6 @@ async function apiDocuments(filters = {}) {
   const d = await r.json();
   if (!r.ok) throw new Error(d.detail || "Failed to load documents.");
   return { documents: d.map(_mapResearch) };
-}
-
-async function apiDocumentDetail(source) {
-  const r = await _apiFetch(`${API_BASE}/repository/${encodeURIComponent(source)}/detail`, {
-    headers: _authHeaders(),
-  });
-  const d = await r.json();
-  if (!r.ok) throw new Error(d.detail || "Document not found.");
-  return _mapResearch(d);
 }
 
 async function apiStatus() {
@@ -796,8 +666,11 @@ async function _apiFetch(url, options = {}) {
   }
   let message = typeof data.detail === "string" ? data.detail : "Request failed. Please try again.";
   if (response.status === 422) message = "Please check the form values.";
-  if (response.status === 429) message = "Too many requests. Please wait a minute and try again.";
-  const error = new Error(message); error.status = response.status; throw error;
+  if (response.status === 429 && typeof data.detail !== "string") message = "Too many requests. Please wait a minute and try again.";
+  const error = new Error(message);
+  error.status = response.status;
+  error.reason = data.reason;
+  throw error;
 }
 async function _apiJson(path, method = "GET", body, authenticated = true) {
   const response = await _apiFetch(`${API_BASE}${path}`, {
@@ -853,11 +726,6 @@ function wireNotifications(bell, dropdown) {
   }; dropdown.refreshNotifications = refresh; refresh();
 }
 
-async function apiPdfData(source) {
-  const response = await _apiFetch(apiPdfUrl(source), {headers: _authHeaders()});
-  return new Uint8Array(await response.arrayBuffer());
-}
-
 function wireNotificationDisclosure(bell, dropdown) {
   dropdown.tabIndex = -1;
   dropdown.setAttribute('role', 'region');
@@ -889,4 +757,24 @@ function wireNotificationDisclosure(bell, dropdown) {
   document.addEventListener('focusin', event => {
     if (!dropdown.contains(event.target) && !bell.contains(event.target)) close();
   });
+}
+
+// Landing is a navigation hint, never an authorization check.
+function landingPage(me) {
+  if (me.landing === "dashboard") return "dashboard.html";
+  if (me.landing === "ask") return "ask.html";
+  return me.role === "librarian" ? "dashboard.html" : "ask.html";
+}
+const apiAskRepository = ({ query, college_id, year, context = [] }) =>
+  _apiJson("/search/ask", "POST", { query, college_id, year, context });
+const apiDocumentById = async id => _mapResearch(await _apiJson(`/repository/${encodeURIComponent(id)}`));
+const apiReaderInfo = id => _apiJson(`/repository/${encodeURIComponent(id)}/reader`);
+async function apiReaderPage(id, page, signal) {
+  const response = await _apiFetch(`${API_BASE}/repository/${encodeURIComponent(id)}/reader/pages/${page}`, {
+    headers: _authHeaders(), signal,
+  });
+  if (!response.headers.get("content-type")?.includes("image/jpeg")) {
+    throw new Error("The reader returned an unsupported page format.");
+  }
+  return response.blob();
 }
